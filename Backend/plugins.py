@@ -230,4 +230,98 @@ class ActiveIdlePlugin(NFPlugin):
         flow.udps.idle_std  = math.sqrt(flow.udps._idle_M2 / (n - 1)) if n > 1 else 0.0
         flow.udps.idle_max  = flow.udps._idle_max if n > 0 else 0.0
         flow.udps.idle_min  = flow.udps._idle_min if flow.udps._idle_min != -1.0 else 0.0
+        
+class FlowEntropyPlugin(NFPlugin):
+    def on_init(self, packet, flow):
+        # Internal counters for byte frequencies (0-255)
+        flow.udps._fwd_byte_counts = [0] * 256
+        flow.udps._bwd_byte_counts = [0] * 256
+        
+        flow.udps._fwd_total_bytes = 0
+        flow.udps._bwd_total_bytes = 0
+        
+        # Final exported features
+        flow.udps.fwd_payload_entropy = 0.0
+        flow.udps.bwd_payload_entropy = 0.0
+        flow.udps.flow_payload_entropy = 0.0
+        
+        self.on_update(packet, flow)
+
+    def on_update(self, packet, flow):
+        if packet.payload_size > 0:
+            try:
+                # TRICK: The payload is the last 'payload_size' bytes of the raw IP packet
+                payload_bytes = packet.ip_packet[-packet.payload_size:]
+                
+                if packet.direction == 0:  # Forward Packet
+                    for byte in payload_bytes:
+                        flow.udps._fwd_byte_counts[byte] += 1
+                    flow.udps._fwd_total_bytes += packet.payload_size
+                    
+                else:  # Backward Packet
+                    for byte in payload_bytes:
+                        flow.udps._bwd_byte_counts[byte] += 1
+                    flow.udps._bwd_total_bytes += packet.payload_size
+            except Exception:
+                # Fail gracefully if packet.ip_packet is malformed
+                pass
+
+    def _calculate_shannon_entropy(self, counts, total):
+        if total == 0:
+            return 0.0
+            
+        entropy = 0.0
+        for count in counts:
+            if count > 0:
+                probability = count / total
+                entropy -= probability * math.log2(probability)
+                
+        return entropy
+
+    def on_expire(self, flow):
+        # Calculate Forward Entropy
+        flow.udps.fwd_payload_entropy = self._calculate_shannon_entropy(
+            flow.udps._fwd_byte_counts, 
+            flow.udps._fwd_total_bytes
+        )
+        
+        # Calculate Backward Entropy
+        flow.udps.bwd_payload_entropy = self._calculate_shannon_entropy(
+            flow.udps._bwd_byte_counts, 
+            flow.udps._bwd_total_bytes
+        )
+        
+        # Calculate Overall Flow Entropy
+        combined_counts = [
+            f + b for f, b in zip(flow.udps._fwd_byte_counts, flow.udps._bwd_byte_counts)
+        ]
+        total_bytes = flow.udps._fwd_total_bytes + flow.udps._bwd_total_bytes
+        
+        flow.udps.flow_payload_entropy = self._calculate_shannon_entropy(
+            combined_counts, 
+            total_bytes
+        )
+
+class QueryLengthPlugin(NFPlugin):
+   
+    def on_init(self, packet, flow):
+        # Initialize default values
+        flow.udps.initial_query_payload_len = 0
+        flow.udps.l7_query_length = 0
+        
+        self.on_update(packet, flow)
+
+    def on_update(self, packet, flow):
+        # Capture the length of the VERY FIRST forward packet that contains a payload.
+        # This acts as the raw byte size of the initial query.
+        if packet.direction == 0 and packet.payload_size > 0:
+            if flow.udps.initial_query_payload_len == 0:
+                flow.udps.initial_query_payload_len = packet.payload_size
+
+    def on_expire(self, flow):
+        # nfstream natively parses L7 application data (via nDPI).
+        # If the flow is DNS, TLS, or HTTP, 'requested_server_name' 
+        # contains the domain being queried (e.g., 'www.google.com').
+        if flow.requested_server_name:
+            flow.udps.l7_query_length = len(flow.requested_server_name)
 

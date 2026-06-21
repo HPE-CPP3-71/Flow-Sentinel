@@ -4,7 +4,7 @@ from datetime import datetime
 from nfstream import NFStreamer
 
 from plugins import BulkPlugin, HeaderLenPlugin, InitWindowPlugin, ExtraFeaturesPlugin, ActiveIdlePlugin
-from feature_builders import build_icmp_row, build_tcp_row, dump_full_flow
+from feature_builders import build_icmp_row, build_tcp_row,dump_full_flow,build_dns_row
 from predictor import run_prediction
 from display import _print_row, _HDR, _RESET
 
@@ -27,7 +27,14 @@ if __name__ == '__main__':
     tcp_fcols   = joblib.load(f"{BASE}/tcp_feature_columns2.pkl")
     print(f"[TCP ]  {len(tcp_fcols)} features | classes: {list(tcp_le.classes_)}")
 
-    INTERFACE = "enp0s8"
+    # ── Load DNS model ───────────────────────────────────────────────────────
+    BASE = os.path.join(MODELS,"DNS")
+    dns_model   = joblib.load(f"{BASE}/DNS_model2.pkl")
+    dns_le      = joblib.load(f"{BASE}/DNS_label_encoder.pkl")
+    dns_fcols   = joblib.load(f"{BASE}/DNS_feature_columns_model2.pkl")
+    print(f"[DNS ]  {len(dns_fcols)} features | classes: {list(dns_le.classes_)}")  
+
+    INTERFACE = "eth0"  # Change this to your network interface name (e.g., "eth0", "wlan0", "en0", etc.)
 
     streamer = NFStreamer(
         source               = INTERFACE,
@@ -94,14 +101,55 @@ if __name__ == '__main__':
         # ────────────────────────────────────────────────────────────────────
         
         elif flow.protocol == 17 and (flow.dst_port == 53 or flow.src_port == 53):
-            
+
             try:
-                row = build_dns_row(flow)   
-                pred, conf = run_prediction(dns_model, dns_le, dns_fcols, row)
+                row = build_dns_row(flow)
+
+                DNS_KEY_FEATURES = [
+                    'udps.l7_query_length',
+                    'src2dst_mean_ps',
+                    'bidirectional_min_ps',
+                    'src2dst_max_ps',
+                    'udps._fwd_total_bytes',
+                    'Flow Pkts/s',
+                    'Pkt Len Var',
+                    'Flow Byts/s',
+                    'bidirectional_max_ps',
+                    'Bwd Seg Size Avg',
+                    'Bwd Pkts/s',
+                    'udps._bwd_total_bytes',
+                    'bidirectional_mean_piat_ms',
+                    'udps.fwd_header_len',
+                    'bidirectional_bytes',
+                    'dst2src_stddev_ps',
+                    'bidirectional_max_piat_ms',
+                    'dst_port',
+                    'src2dst_stddev_ps',
+                    'udps.active_min'
+                ]
+
+                print("\n--- DNS Top Features ---")
+
+                for feat in DNS_KEY_FEATURES:
+                    val = row.get(feat, "MISSING")
+
+                    if isinstance(val, float):
+                        print(f"  {feat:<35} = {val:.4f}")
+                    else:
+                        print(f"  {feat:<35} = {val}")
+
+                print("-------------------------\n")
+
+                pred, conf = run_prediction(
+                    dns_model,
+                    dns_le,
+                    dns_fcols,
+                    row
+                )
+
             except Exception as e:
                 pred, conf = f"ERR:{e}", 0.0
-                
-                
+
             _print_row(ts, "DNS", flow, pred, conf)
             
         # ────────────────────────────────────────────────────────────────────

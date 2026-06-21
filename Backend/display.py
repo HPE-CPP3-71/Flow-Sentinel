@@ -12,6 +12,8 @@ _LABEL_COLOR = {
     "FTP-BRUTEFORCE":  _RED,
     "SSH-BRUTEFORCE":  _RED,
     "WEB-BRUTEFORCE":  _RED,
+    "DNS-SPOOFING":    _RED,
+    "DNS-TUNNELING":   _YELLOW,
 }
 
 _HDR = (f"{'Time':<10} {'Model':<5} {'Src IP':<18} {'Dst IP':<18} "
