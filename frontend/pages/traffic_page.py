@@ -141,13 +141,19 @@ class TrafficPage(ctk.CTkFrame):
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_rowconfigure(1, weight=1)
 
-        head = ctk.CTkFrame(panel, fg_color="transparent")
-        head.grid(row=0, column=0, sticky="ew", padx=20, pady=(16, 6))
+        # Header band — same treatment as the Overview "Live Capture Stats"
+        # card: distinct lighter fill, flush rounded top corners sharing the
+        # card's corners, title sitting inside the band.
+        head = ctk.CTkFrame(panel, fg_color=theme.COLORS["bg_panel_header"],
+                            corner_radius=theme.RADIUS["card"])
+        head.grid(row=0, column=0, sticky="ew")
         head.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(head, text="Flow Predictions", font=self.fonts["headline_md"],
-                     text_color=theme.COLORS["text_headline"]).grid(row=0, column=0, sticky="w")
+                     text_color=theme.COLORS["text_headline"]
+                     ).grid(row=0, column=0, sticky="w", padx=20, pady=18)
         ctk.CTkLabel(head, text="•  •  •", font=self.fonts["mono_xs"],
-                     text_color=theme.COLORS["text_muted"]).grid(row=0, column=1, sticky="e")
+                     text_color=theme.COLORS["text_muted"]
+                     ).grid(row=0, column=1, sticky="e", padx=(0, 20))
 
         self.pred_table = FlowTable(
             panel, self.app, _COLUMNS, self._build_rows(), row_height=42,

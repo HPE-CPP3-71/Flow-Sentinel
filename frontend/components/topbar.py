@@ -20,7 +20,7 @@ from frontend.components.logo import FlowLogo
 class TopBar(ctk.CTkFrame):
     def __init__(self, parent, app, variant: str = "dashboard",
                  on_start=None, on_stop=None):
-        super().__init__(parent, fg_color=theme.COLORS["bg_app"],
+        super().__init__(parent, fg_color=theme.COLORS["bg_header"],
                          corner_radius=0, height=64,
                          border_width=0)
         self.app = app
@@ -31,20 +31,21 @@ class TopBar(ctk.CTkFrame):
         self.grid_propagate(False)
         self.grid_columnconfigure(0, weight=1)   # brand block — pushes actions right
 
-        # subtle hairline along the bottom edge
-        self.configure(border_width=0)
-
         self._build_brand()
         if variant == "start":
             self._build_start_actions()
         else:
             self._build_dashboard_actions()
 
+        # hairline separating the header from the content area below
+        ctk.CTkFrame(self, fg_color=theme.COLORS["border_subtle"], height=1
+                     ).place(relx=0, rely=1.0, relwidth=1.0, anchor="sw")
+
     # ── Left: logo + wordmark ────────────────────────────────────────────
     def _build_brand(self) -> None:
         brand = ctk.CTkFrame(self, fg_color="transparent")
         brand.grid(row=0, column=0, sticky="w", padx=(24, 0), pady=14)
-        FlowLogo(brand, size=26, bg=theme.COLORS["bg_app"]).pack(side="left")
+        FlowLogo(brand, size=26, bg=theme.COLORS["bg_header"]).pack(side="left")
         ctk.CTkLabel(brand, text="FlowSentinel", font=self.fonts["headline_md"],
                      text_color=theme.TEAL[300]).pack(side="left", padx=(10, 0))
 
@@ -70,7 +71,11 @@ class TopBar(ctk.CTkFrame):
             actions, text="□ Stop", width=80, height=34,
             font=self.fonts["body_sm"], corner_radius=theme.RADIUS["button"],
             command=self.on_stop, **theme.BUTTON_VARIANTS["outlined"],
-        ).pack(side="left", padx=(0, 12))
+        ).pack(side="left", padx=(0, 14))
+
+        # thin divider between the controls and the settings gear
+        ctk.CTkFrame(actions, fg_color=theme.COLORS["border"], width=1, height=26
+                     ).pack(side="left", padx=(0, 14))
 
         self._icon_button(actions, "⚙").pack(side="left")
 
@@ -79,6 +84,6 @@ class TopBar(ctk.CTkFrame):
         return ctk.CTkButton(
             parent, text=glyph, width=34, height=34,
             font=self.fonts["body_lg"], corner_radius=theme.RADIUS["button"],
-            fg_color="transparent", hover_color=theme.COLORS["bg_card"],
+            fg_color="transparent", hover_color=theme.COLORS["bg_card_alt"],
             text_color=theme.COLORS["text_muted"],
         )

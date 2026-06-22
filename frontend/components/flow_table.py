@@ -56,6 +56,7 @@ class FlowTable(ctk.CTkFrame):
 
         self._rows: list[ctk.CTkFrame] = []
         self._base_fills: list[str] = []
+        self._base_borders: list[str] = []
         self._selected: int | None = None
 
         self.grid_columnconfigure(0, weight=1)
@@ -105,35 +106,45 @@ class FlowTable(ctk.CTkFrame):
     # ── data rows ────────────────────────────────────────────────────────
     def _build_row(self, row: dict, index: int) -> None:
         fill = row.get("_fill") or "transparent"
+        # A 1px border is present from creation (matched to the row's own fill,
+        # so it's invisible) — selection only recolours it, never toggles the
+        # width. Toggling border_width on a live CTkFrame leaves the rounded
+        # outline half-drawn; recolouring an existing border redraws cleanly.
+        base_border = fill if fill != "transparent" else theme.COLORS["bg_card"]
         rf = ctk.CTkFrame(self.body, fg_color=fill, height=self.row_height,
-                          corner_radius=6)
-        rf.grid(row=index, column=0, sticky="ew", pady=0)
+                          corner_radius=8, border_width=1, border_color=base_border)
+        rf.grid(row=index, column=0, sticky="ew", pady=1)
         rf.grid_propagate(False)
         self._configure_columns(rf)
 
         dim = row.get("_dim", False)
+        ncols = len(self.columns)
         for c, col in enumerate(self.columns):
             cell = row.get(col["key"], "")
-            self._build_cell(rf, cell, c, col.get("align", "w"), dim)
+            # inset the first/last cells so content never sits on the row's
+            # rounded corners / vertical border edges
+            left = 14 if c == 0 else 0
+            right = 14 if c == ncols - 1 else self.cell_pad
+            self._build_cell(rf, cell, c, col.get("align", "w"), dim, (left, right))
 
         if self.separators:
             ctk.CTkFrame(rf, fg_color=theme.COLORS["border_subtle"], height=1
-                         ).place(relx=0, rely=1.0, relwidth=1.0, anchor="sw")
+                         ).place(relx=0.02, rely=1.0, relwidth=0.96, anchor="sw")
 
         self._rows.append(rf)
         self._base_fills.append(fill)
+        self._base_borders.append(base_border)
 
         if self.selectable:
             self._bind_click(rf, index)
 
-    def _build_cell(self, parent, cell, col_index, align, dim) -> None:
+    def _build_cell(self, parent, cell, col_index, align, dim, pad) -> None:
         spec = cell if isinstance(cell, dict) else {"text": str(cell)}
         text = spec.get("text", "")
         font = self.cell_font
         color = spec.get("color", theme.COLORS["text_body"])
         if dim:
             color = spec.get("dim_color", theme.COLORS["text_muted"])
-        pad = (0, self.cell_pad)
         side = "left" if align == "w" else "right"
 
         # Protocol pill
@@ -186,8 +197,9 @@ class FlowTable(ctk.CTkFrame):
         for i, rf in enumerate(self._rows):
             if i == index:
                 rf.configure(fg_color=theme.COLORS["row_selected"],
-                             border_width=1, border_color=theme.COLORS["nav_active"])
+                             border_color=theme.COLORS["nav_active"])
             else:
-                rf.configure(fg_color=self._base_fills[i], border_width=0)
+                rf.configure(fg_color=self._base_fills[i],
+                             border_color=self._base_borders[i])
         if callable(self.on_select):
             self.on_select(index)

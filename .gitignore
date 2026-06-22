@@ -1,0 +1,122 @@
+# ==========================
+# Model Files (optional)
+# Uncomment if models are large and shouldn't be tracked
+# ==========================
+# backend/models/*.pkl
+# backend/models/*.joblib
+# backend/models/*.onnx
+
+
+.png
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# ==========================
+# Build / Distribution
+# ==========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ==========================
+# IDEs
+# ==========================
+.vscode/
+.idea/
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================
+# Logs
+# ==========================
+*.log
+logs/
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.*
+
+# ==========================
+# Jupyter
+# ==========================
+.ipynb_checkpoints/
+
+# ==========================
+# Test / Coverage
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+
+
+# ==========================
+# Packet Captures
+# ==========================
+*.pcap
+*.pcapng
+captures/
+pcaps/
+
+# ==========================
+# Generated Data
+# ==========================
+*.csv
+*.xlsx
+*.json
+*.parquet
+
+# Keep sample datasets if needed
+#!sample_data/*.csv
+
+# ==========================
+# Temporary Files
+# ==========================
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ==========================
+# CustomTkinter Cache
+# ==========================
+customtkinter.json
+
+# ==========================
+# PyInstaller
+# ==========================
+*.spec
+
+# ==========================
+# Local Configuration
+# ==========================
+config.local.py
+settings.local.py
+
+# ==========================
+# Misc
+# ==========================
+*.swp
+*.swo

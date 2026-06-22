@@ -122,6 +122,8 @@ COLORS = {
     "bg_app": SLATE[950],         # outermost window background
     "bg_card": SLATE[900],        # cards, panels, search bar fill
     "bg_card_alt": SLATE[800],    # nested/secondary surfaces (secondary button, nav pill)
+    "bg_header": "#111c33",       # top navigation bar — lighter navy, distinct from body
+    "bg_panel_header": "#1a2740", # table "header band" (Live Capture Stats title row)
     "border": SLATE[700],
     "border_subtle": SLATE[800],
 
