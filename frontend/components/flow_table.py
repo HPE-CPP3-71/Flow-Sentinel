@@ -157,7 +157,7 @@ class FlowTable(ctk.CTkFrame):
                 fg_color=spec.get("badge_fg", theme.COLORS["badge_bg"]),
                 text_color=spec.get("badge_text", theme.COLORS["badge_text"]),
                 corner_radius=6, height=22,
-            ).pack(side=side, expand =True)
+            ).pack(side=side)
             return
 
         # Status dot + text (and/or trailing glyph pinned right)
@@ -169,7 +169,7 @@ class FlowTable(ctk.CTkFrame):
                              text_color=spec.get("trailing_color", color)
                              ).pack(side="right", padx=(8, 4))
             inner = ctk.CTkFrame(holder, fg_color="transparent")
-            inner.pack(side=side,expand = True)
+            inner.pack(side=side)
             if spec.get("dot"):
                 ctk.CTkLabel(inner, text="●", font=self.fonts["mono_xs"],
                              text_color=color if dim else spec["dot"]

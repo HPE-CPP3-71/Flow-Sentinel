@@ -34,7 +34,7 @@ To get a pixel-exact match, install on the target VM:
 import logging
 import platform
 import tkinter.font as tkfont
-
+import os
 import customtkinter as ctk
 
 logger = logging.getLogger(__name__)
@@ -231,13 +231,24 @@ def _resolve_family(preferred: str, fallback: str) -> str:
 
 def get_fonts() -> dict:
     """Call once, from App.__init__, after super().__init__() has run."""
-    is_windows = platform.system() == "Windows"
+    
+    # 1. Dynamically find the assets/fonts/ directory
+    # Assuming theme.py is inside the 'frontend' folder, we go up one level, then into assets
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    font_dir = os.path.join(current_dir, "..", "assets", "fonts")
 
-    sans_fallback = "Segoe UI" if is_windows else "DejaVu Sans"
-    mono_fallback = "Consolas" if is_windows else "DejaVu Sans Mono"
+    # 2. Load the bundled font files into CustomTkinter
+    try:
+        # Update these filenames if your downloaded .ttf files are named differently
+        ctk.FontManager.load_font(os.path.join(font_dir, "Geist-Regular.ttf"))
+        ctk.FontManager.load_font(os.path.join(font_dir, "Geist-Bold.ttf"))
+        ctk.FontManager.load_font(os.path.join(font_dir, "JetBrainsMono-Regular.ttf"))
+    except Exception as e:
+        logger.error(f"Failed to load bundled fonts: {e}")
 
-    sans_family = _resolve_family("Geist", sans_fallback)
-    mono_family = _resolve_family("JetBrains Mono", mono_fallback)
+    # 3. Because they are loaded in memory, we can safely hardcode the exact names
+    sans_family = "Geist"
+    mono_family = "JetBrains Mono"
 
     return {
         # Sans-serif (Geist) — headlines & body
@@ -250,6 +261,7 @@ def get_fonts() -> dict:
         "body_lg": ctk.CTkFont(family=sans_family, size=16),
         "body_md": ctk.CTkFont(family=sans_family, size=14),
         "body_sm": ctk.CTkFont(family=sans_family, size=12),
+        
         # Monospace (JetBrains Mono) — labels, tables, terminal, stat values
         "stat_value": ctk.CTkFont(family=mono_family, size=30, weight="bold"),
         "label_md": ctk.CTkFont(family=mono_family, size=13),

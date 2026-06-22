@@ -30,7 +30,7 @@ from frontend.components.topbar import TopBar
 _COLUMNS = [
     {"key": "src", "title": "SOURCE IP", "weight": 3, "align": "w"},
     {"key": "dst", "title": "DESTINATION IP", "weight": 3, "align": "w"},
-    {"key": "pkts", "title": "PACKETS", "weight": 2, "align": "e"},
+    {"key": "pkts", "title": "PACKETS", "weight": 2, "align": "w"},
     {"key": "proto", "title": "PROTOCOL", "weight": 2, "align": "w"},
     {"key": "status", "title": "STATUS / PREDICTION", "weight": 3, "align": "w"},
 ]
@@ -62,8 +62,7 @@ def _row_for_index(i: int) -> dict:
             "dst": "10.0.0.8", "pkts": {"text": f"{(i * 613 % 90000) + 1000:,}"},
             "proto": {"text": "ICMP", "badge": True, "badge_fg": "#3a1a1f",
                       "badge_text": theme.COLORS["danger_text"]},
-            "status": {"text": "Suspicious Volumetric", "dot": bad, "color": bad,
-                       "trailing": "⛉", "trailing_color": bad},
+            "status": {"text": "Suspicious Volumetric", "dot": bad, "color": bad,},
             "_fill": theme.COLORS["danger_bg"],
         }
 
