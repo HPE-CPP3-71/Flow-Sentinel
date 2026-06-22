@@ -22,18 +22,26 @@ from frontend import theme
 class App(ctk.CTk):
     def __init__(self, state, on_start):
         super().__init__()
-        self.state = state
+        # NOTE: stored as `app_state`, not `state` — ctk.CTk (Tk) already has a
+        # built-in `.state()` method (window state), and CustomTkinter's DPI
+        # scaling tracker calls it. Shadowing it with the AppState object
+        # breaks that callback, so we keep the Tk method intact.
+        self.app_state = state
         self.on_start = on_start
 
         ctk.set_appearance_mode("dark")
         self.configure(fg_color=theme.COLORS["bg_app"])
         self.title("FlowSentinel")
-        self.geometry("1200x760")
-        self.minsize(1000, 640)
+        self.geometry("1360x860")
+        self.minsize(1180, 740)
 
         # Fonts need a live Tk root before they can be built — this is that
         # point. theme.get_fonts() also does the installed-font check.
         self.fonts = theme.get_fonts()
+
+        # Shared UI state that needs to persist across page switches (e.g. the
+        # sidebar collapse toggle), so it lives on the app rather than a page.
+        self.sidebar_collapsed = False
 
         # All pages live in this container and raise themselves over each
         # other via .tkraise() — the classic Tkinter multi-page pattern.
@@ -43,6 +51,22 @@ class App(ctk.CTk):
         self.container.grid_columnconfigure(0, weight=1)
 
         self.pages: dict = {}
+        self._register_pages()
+        self.show_page("start")
+
+    def _register_pages(self) -> None:
+        """
+        Imported here (not at module top) so the page modules — which pull in
+        the component widgets — are only loaded once a Tk root and fonts
+        exist, and to keep app.py importable for the standalone theme preview.
+        """
+        from frontend.pages.start_page import StartPage
+        from frontend.pages.overview_page import OverviewPage
+        from frontend.pages.traffic_page import TrafficPage
+
+        self.register_page("start", StartPage)
+        self.register_page("overview", OverviewPage)
+        self.register_page("traffic", TrafficPage)
 
     def register_page(self, name: str, frame_class) -> None:
         """

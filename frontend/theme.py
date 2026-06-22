@@ -136,6 +136,32 @@ COLORS = {
     "secondary": BLUE[500],
     "tertiary": TERTIARY[500],
     "neutral": SLATE[900],
+
+    # ── Page-specific semantic tokens (pulled from the three Figma frames) ──
+    # Status / prediction states
+    "success": TEAL[400],          # BENIGN / Normal Traffic dot + text
+    "success_text": TEAL[300],
+    "warning": "#e0a458",          # "⚠ ANOMALY" label on the Traffic table
+    "danger": "#f87171",           # rose-400 — anomaly count, suspicious rows
+    "danger_text": "#fca5a5",
+    "danger_bg": "#241318",        # red-tinted card / row fill
+    "danger_border": "#7f1d1d",    # rose-900 — anomaly stat-card border
+
+    # Accent line / nav
+    "accent_line": TEAL[500],      # vertical teal divider on the Start page
+    "nav_active": BLUE[600],       # highlighted sidebar item
+    "nav_active_hover": BLUE[700],
+    "link": BLUE[400],             # clickable source-IP cells
+
+    # Table rows
+    "row_selected": "#16233b",     # clicked Flow-Predictions row highlight
+
+    # Badges (protocol pills) & terminal chrome
+    "badge_bg": SLATE[800],
+    "badge_text": SLATE[300],
+    "term_red": "#ff5f56",
+    "term_yellow": "#ffbd2e",
+    "term_green": "#27c93f",
 }
 
 # Ready to unpack straight into a CTkButton: CTkButton(**BUTTON_VARIANTS["primary"], text="...")
@@ -211,11 +237,20 @@ def get_fonts() -> dict:
     mono_family = _resolve_family("JetBrains Mono", mono_fallback)
 
     return {
+        # Sans-serif (Geist) — headlines & body
+        "display": ctk.CTkFont(family=sans_family, size=58, weight="bold"),
         "headline_xl": ctk.CTkFont(family=sans_family, size=40, weight="bold"),
+        "title": ctk.CTkFont(family=sans_family, size=26, weight="bold"),
         "headline_lg": ctk.CTkFont(family=sans_family, size=24, weight="bold"),
         "headline_md": ctk.CTkFont(family=sans_family, size=18, weight="bold"),
+        "start_btn": ctk.CTkFont(family=sans_family, size=30, weight="bold"),
+        "body_lg": ctk.CTkFont(family=sans_family, size=16),
         "body_md": ctk.CTkFont(family=sans_family, size=14),
         "body_sm": ctk.CTkFont(family=sans_family, size=12),
+        # Monospace (JetBrains Mono) — labels, tables, terminal, stat values
+        "stat_value": ctk.CTkFont(family=mono_family, size=30, weight="bold"),
         "label_md": ctk.CTkFont(family=mono_family, size=13),
+        "mono_md": ctk.CTkFont(family=mono_family, size=12),
         "label_sm": ctk.CTkFont(family=mono_family, size=11),
+        "mono_xs": ctk.CTkFont(family=mono_family, size=10),
     }
