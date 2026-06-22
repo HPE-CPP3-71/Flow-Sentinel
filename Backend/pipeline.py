@@ -27,7 +27,7 @@ from typing import Dict, List, Optional
 import joblib
 from nfstream import NFStreamer
 
-from backend.feature_builders import build_icmp_row, build_tcp_row, dump_full_flow
+from backend.feature_builders import build_icmp_row, build_dns_row,build_tcp_row, dump_full_flow
 from backend.plugins import (
     ActiveIdlePlugin,
     BulkPlugin,
