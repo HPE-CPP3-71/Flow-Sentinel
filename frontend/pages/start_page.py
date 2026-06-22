@@ -81,7 +81,7 @@ class StartPage(ctk.CTkFrame):
         return hero
 
     def _build_terminal(self, parent) -> ctk.CTkFrame:
-        card = ctk.CTkFrame(parent, fg_color=theme.COLORS["bg_card"],
+        card = ctk.CTkFrame(parent, fg_color=theme.COLORS["Start_Page"],
                             corner_radius=theme.RADIUS["card"], width=620, height=720,
                             border_width=1, border_color=theme.COLORS["border_subtle"])
         card.grid_propagate(False)
@@ -127,7 +127,7 @@ class StartPage(ctk.CTkFrame):
 
         StartButton(
             center, command=self._on_start, size=300,
-            bg=theme.COLORS["bg_card"], font=self.fonts["start_btn"],
+            bg=theme.COLORS["Start_Page"], font=self.fonts["start_btn"],
         ).grid(row=1, column=0)
 
         # ── status line ──────────────────────────────────────────────────

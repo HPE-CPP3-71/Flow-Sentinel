@@ -60,8 +60,9 @@ class Sidebar(ctk.CTkFrame):
             command=self._toggle,
         )
         self.chevron.grid(row=0, column=0, sticky="e")
-
-        for i, (key, glyph, label) in enumerate(NAV_ITEMS, start=1):
+        self.grid_rowconfigure(1, weight=1)
+        
+        for i, (key, glyph, label) in enumerate(NAV_ITEMS, start=2):
             is_active = key == self.active
             if is_active:
                 colors = dict(fg_color=theme.COLORS["nav_active"],
@@ -76,9 +77,11 @@ class Sidebar(ctk.CTkFrame):
                 corner_radius=theme.RADIUS["button"],
                 command=lambda k=key: self._navigate(k), **colors,
             )
-            btn.grid(row=i, column=0, sticky="ew", padx=14, pady=3)
+            btn.grid(row=i, column=0, sticky="ew", padx=14, pady=6)
             self._buttons[key] = (btn, glyph, label)
 
+        self.grid_rowconfigure(len(NAV_ITEMS) + 2, weight=1)
+        
     # ── collapse / expand ────────────────────────────────────────────────
     def _apply_mode(self) -> None:
         self.chevron.configure(text="›" if self.collapsed else "‹")

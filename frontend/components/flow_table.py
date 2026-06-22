@@ -100,7 +100,7 @@ class FlowTable(ctk.CTkFrame):
                 text_color=theme.COLORS["text_muted"], anchor=align,
             ).grid(row=0, column=c, sticky="ew", padx=(0, self.cell_pad), pady=(2, 6))
 
-        ctk.CTkFrame(self, fg_color=theme.COLORS["border_subtle"], height=1
+        ctk.CTkFrame(self, fg_color=theme.COLORS["border_subtle"], height=2
                      ).grid(row=1, column=0, sticky="ew")
 
     # ── data rows ────────────────────────────────────────────────────────
@@ -117,6 +117,7 @@ class FlowTable(ctk.CTkFrame):
         rf.grid_propagate(False)
         self._configure_columns(rf)
 
+        rf.grid_rowconfigure(0, weight=1)
         dim = row.get("_dim", False)
         ncols = len(self.columns)
         for c, col in enumerate(self.columns):
@@ -128,8 +129,8 @@ class FlowTable(ctk.CTkFrame):
             self._build_cell(rf, cell, c, col.get("align", "w"), dim, (left, right))
 
         if self.separators:
-            ctk.CTkFrame(rf, fg_color=theme.COLORS["border_subtle"], height=1
-                         ).place(relx=0.02, rely=1.0, relwidth=0.96, anchor="sw")
+            ctk.CTkFrame(rf, fg_color=theme.COLORS["border_subtle"], height=2
+                         ).place(relx=0.00, rely=1.0, relwidth=0.96, anchor="sw")
 
         self._rows.append(rf)
         self._base_fills.append(fill)
@@ -156,19 +157,19 @@ class FlowTable(ctk.CTkFrame):
                 fg_color=spec.get("badge_fg", theme.COLORS["badge_bg"]),
                 text_color=spec.get("badge_text", theme.COLORS["badge_text"]),
                 corner_radius=6, height=22,
-            ).pack(side=side)
+            ).pack(side=side, expand =True)
             return
 
         # Status dot + text (and/or trailing glyph pinned right)
         if spec.get("dot") or spec.get("trailing"):
             holder = ctk.CTkFrame(parent, fg_color="transparent")
-            holder.grid(row=0, column=col_index, sticky="ew", padx=pad)
+            holder.grid(row=0, column=col_index, sticky="nsew", padx=pad)
             if spec.get("trailing"):
                 ctk.CTkLabel(holder, text=spec["trailing"], font=self.cell_font,
                              text_color=spec.get("trailing_color", color)
                              ).pack(side="right", padx=(8, 4))
             inner = ctk.CTkFrame(holder, fg_color="transparent")
-            inner.pack(side=side)
+            inner.pack(side=side,expand = True)
             if spec.get("dot"):
                 ctk.CTkLabel(inner, text="●", font=self.fonts["mono_xs"],
                              text_color=color if dim else spec["dot"]
@@ -181,7 +182,7 @@ class FlowTable(ctk.CTkFrame):
             font = ctk.CTkFont(family=font.cget("family"), size=font.cget("size"),
                                weight="bold")
         ctk.CTkLabel(parent, text=text, font=font, text_color=color, anchor=align,
-                     ).grid(row=0, column=col_index, sticky="ew", padx=pad)
+                     ).grid(row=0, column=col_index, sticky="nsew", padx=pad)
 
     # ── selection ────────────────────────────────────────────────────────
     def _bind_click(self, widget, index: int) -> None:
@@ -196,10 +197,8 @@ class FlowTable(ctk.CTkFrame):
         self._selected = index
         for i, rf in enumerate(self._rows):
             if i == index:
-                rf.configure(fg_color=theme.COLORS["row_selected"],
-                             border_color=theme.COLORS["nav_active"])
+                rf.configure(fg_color=theme.COLORS["row_selected"])
             else:
-                rf.configure(fg_color=self._base_fills[i],
-                             border_color=self._base_borders[i])
+                rf.configure(fg_color=self._base_fills[i])
         if callable(self.on_select):
             self.on_select(index)

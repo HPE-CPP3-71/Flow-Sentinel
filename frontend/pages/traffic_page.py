@@ -84,16 +84,32 @@ class TrafficPage(ctk.CTkFrame):
 
         Footer(self, app).grid(row=2, column=0, sticky="ew")
 
-    # ── content ──────────────────────────────────────────────────────────
+# ── content ──────────────────────────────────────────────────────────
     def _build_content(self, parent) -> ctk.CTkFrame:
         content = ctk.CTkFrame(parent, fg_color="transparent")
-        content.grid_columnconfigure(0, weight=1)
-        content.grid_rowconfigure(1, weight=1)
 
-        self._build_header(content).grid(row=0, column=0, sticky="ew", pady=(0, 18))
+        # 1. THE HEADER (Packed at the top)
+        header = self._build_header(content)
+        header.pack(side="top", fill="x", pady=(0, 18))
 
+        # 2. THE DIVIDER LINE (Packed right under the header)
+        divider = ctk.CTkFrame(content, fg_color=theme.COLORS["text_muted"], height=2, corner_radius=0)
+        divider.pack(side="top", fill="x", pady=(0, 22))
+
+        # 3. THE STOP CAPTURE BUTTON (Pinned firmly to the absolute bottom)
+        stop_row = ctk.CTkFrame(content, fg_color="transparent")
+        stop_row.pack(side="bottom", pady=(22, 2))
+        ctk.CTkButton(
+            stop_row, text="◉  STOP CAPTURE", width=220, height=48,
+            font=self.fonts["body_md"], corner_radius=theme.RADIUS["button"],
+            fg_color="#a51d1d", hover_color="#8a1818", text_color=theme.SLATE[50],
+            command=lambda: self.app.show_page("start"),
+        ).pack()
+
+        # 4. THE PANELS (Fills all remaining space in the middle)
         panels = ctk.CTkFrame(content, fg_color="transparent")
-        panels.grid(row=1, column=0, sticky="nsew")
+        panels.pack(side="top", fill="both", expand=True)
+        
         panels.grid_rowconfigure(0, weight=1)
         panels.grid_columnconfigure(0, weight=1, uniform="tp")   # feature  (1/3)
         panels.grid_columnconfigure(1, weight=2, uniform="tp")   # predictions (2/3)
@@ -102,14 +118,6 @@ class TrafficPage(ctk.CTkFrame):
         self.feature_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
         self._build_predictions(panels).grid(row=0, column=1, sticky="nsew")
 
-        stop_row = ctk.CTkFrame(content, fg_color="transparent")
-        stop_row.grid(row=2, column=0, pady=(22, 2))
-        ctk.CTkButton(
-            stop_row, text="◉  STOP CAPTURE", width=220, height=48,
-            font=self.fonts["body_md"], corner_radius=theme.RADIUS["button"],
-            fg_color="#a51d1d", hover_color="#8a1818", text_color=theme.SLATE[50],
-            command=lambda: self.app.show_page("start"),
-        ).pack()
         return content
 
     def _build_header(self, parent) -> ctk.CTkFrame:
@@ -141,23 +149,18 @@ class TrafficPage(ctk.CTkFrame):
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_rowconfigure(1, weight=1)
 
-        # Header band — same treatment as the Overview "Live Capture Stats"
-        # card: distinct lighter fill, flush rounded top corners sharing the
-        # card's corners, title sitting inside the band.
-        head = ctk.CTkFrame(panel, fg_color=theme.COLORS["bg_panel_header"],
-                            corner_radius=theme.RADIUS["card"])
-        head.grid(row=0, column=0, sticky="ew")
+        head = ctk.CTkFrame(panel, fg_color="transparent")
+        head.grid(row=0, column=0, sticky="ew", padx=20, pady=(16, 6))
         head.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(head, text="Flow Predictions", font=self.fonts["headline_md"],
-                     text_color=theme.COLORS["text_headline"]
-                     ).grid(row=0, column=0, sticky="w", padx=20, pady=18)
+                     text_color=theme.COLORS["text_headline"]).grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(head, text="•  •  •", font=self.fonts["mono_xs"],
-                     text_color=theme.COLORS["text_muted"]
-                     ).grid(row=0, column=1, sticky="e", padx=(0, 20))
+                     text_color=theme.COLORS["text_muted"]).grid(row=0, column=1, sticky="e")
 
         self.pred_table = FlowTable(
             panel, self.app, _COLUMNS, self._build_rows(), row_height=42,
             font_key="mono_md", cell_pad=8, scrollable=True, selectable=True,
+            separators=True,
             on_select=self._on_row_select,
         )
         self.pred_table.grid(row=1, column=0, sticky="nsew", padx=(20, 8), pady=(4, 0))

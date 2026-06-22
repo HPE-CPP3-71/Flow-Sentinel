@@ -61,8 +61,8 @@ class FeaturePanel(ctk.CTkFrame):
         icon.grid(row=0, column=1, sticky="e")
         icon.grid_propagate(False)
         ctk.CTkLabel(icon, text=">_", font=self.fonts["mono_md"],
-                     text_color=theme.COLORS["text_muted"]).place(relx=0.5, rely=0.5,
-                                                                  anchor="center")
+                     text_color=theme.COLORS["text_muted"]).place(relx=0.2, rely=0.5,
+                                                                  anchor="w")
 
         # divider under the header
         ctk.CTkFrame(self, fg_color=theme.COLORS["border_subtle"], height=1

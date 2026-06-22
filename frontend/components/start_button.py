@@ -27,6 +27,7 @@ def _blend(c_from: str, c_to: str, t: float) -> str:
 class StartButton(tk.Canvas):
     def __init__(self, parent, command=None, size: int = 300,
                  bg: str | None = None, font=None):
+        
         bg = bg or theme.COLORS["bg_card"]
         super().__init__(parent, width=size, height=size, bg=bg,
                          highlightthickness=0, bd=0)
@@ -49,7 +50,7 @@ class StartButton(tk.Canvas):
         r = self._radius
 
         # Soft glow — concentric rings, faint outside, stronger toward the disc.
-        glow_span = int(self._size * 0.13)
+        glow_span = int(self._size * 0.0)
         steps = 26
         for i in range(steps):
             frac = i / (steps - 1)
