@@ -30,7 +30,7 @@ class StartButton(tk.Canvas):
         
         bg = bg or theme.COLORS["bg_card"]
         super().__init__(parent, width=size, height=size, bg=bg,
-                         highlightthickness=0, bd=0)
+                         highlightthickness=0.04, bd=0)
         self._command = command
         self._size = size
         self._bg = bg
@@ -50,7 +50,7 @@ class StartButton(tk.Canvas):
         r = self._radius
 
         # Soft glow — concentric rings, faint outside, stronger toward the disc.
-        glow_span = int(self._size * 0.0)
+        glow_span = int(self._size * 0.04)
         steps = 26
         for i in range(steps):
             frac = i / (steps - 1)
