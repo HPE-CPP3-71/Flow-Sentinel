@@ -60,7 +60,13 @@ TCP_KEY_FEATURES = [
     'src2dst_min_ps', 'bidirectional_mean_ps', 'bidirectional_max_ps',
     'udps.fwd_seg_size_min', 'udps.init_fwd_win',
 ]
-
+ICMP_KEY_FEATURES_UDPS = [
+    'fwd_byts_b_avg', 'fwd_pkts_b_avg', 'fwd_blk_rate_avg',
+    'fwd_header_len', 'fwd_act_data_pkts',
+    'active_mean', 'active_max', 'active_min',
+    'idle_mean', 'idle_std', 'idle_max', 'idle_min'
+]
+ICMP_KEY_FEATURES_EX = ['src2dst_min_piat_ms', 'src2dst_packets']
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Model loading
@@ -142,8 +148,19 @@ def _build_event(
 def _process_icmp(flow, ts: str, models: Models) -> FlowEvent:
     # Early-exit gate: tiny flows (VirtualBox internal chatter, etc.) are
     # benign by definition — skip the model call entirely, same as before.
+    
+    key_features: Dict[str, object] = {}
+    
+    # Safely get udps plugin features
+    for field in ICMP_KEY_FEATURES_UDPS:
+        key_features[f"udps.{field}"] = getattr(flow.udps, field, "MISSING")
+        
+    # Safely get core flow features
+    for field in ICMP_KEY_FEATURES_EX:
+        key_features[field] = getattr(flow, field, "MISSING")
+
     if flow.bidirectional_packets < 5 and flow.bidirectional_duration_ms < 10:
-        return _build_event(ts, "ICMP", flow, "BENIGN", 1.0)
+        return _build_event(ts, "ICMP", flow, "BENIGN", 1.0,key_features)
 
     try:
         row = build_icmp_row(flow)
@@ -151,7 +168,7 @@ def _process_icmp(flow, ts: str, models: Models) -> FlowEvent:
     except Exception as e:
         pred, conf = f"ERR:{e}", 0.0
 
-    return _build_event(ts, "ICMP", flow, pred, conf)
+    return _build_event(ts, "ICMP", flow, pred, conf,key_features)
 
 
 def _process_dns(flow, ts: str, models: Models) -> FlowEvent:

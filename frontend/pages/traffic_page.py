@@ -241,11 +241,13 @@ class TrafficPage(ctk.CTkFrame):
     def _on_row_select(self, index: int) -> None:
         """Push the selected flow's feature dict into the FeaturePanel."""
         if 0 <= index < len(self._live_events):
-            features = self._live_events[index].key_features
+            event = self._live_events[index]
+            features = event.key_features
             if features:
+                self.feature_panel.title_label.configure(text=f"--- {event.model_tag} Model Features ---")
                 self.feature_panel.update_features(features)
             else:
-                # ICMP flows or error events have an empty key_features dict
+                self.feature_panel.title_label.configure(text="--- Model Features ---")
                 self.feature_panel.reset()
 
     # ── poll loop — drains state.queue every _POLL_MS ────────────────────
