@@ -89,6 +89,8 @@ class AppState:
         self.start_time: Optional[datetime] = None
         self.interface: Optional[str] = None
 
+        self.accumulated_uptime: float = 0.0
+
     # ════════════════════════════════════════════════════════════════════
     # Methods the WORKER thread calls (backend/pipeline.py)
     # ════════════════════════════════════════════════════════════════════
@@ -111,6 +113,8 @@ class AppState:
 
     def stop(self) -> None:
         with self.lock:
+            if self.running and self.start_time:
+                self.accumulated_uptime += (datetime.now() - self.start_time).total_seconds()
             self.running = False
 
     # ════════════════════════════════════════════════════════════════════
@@ -163,10 +167,11 @@ class AppState:
 
     def uptime_str(self) -> str:
         with self.lock:
-            start = self.start_time
-        if not start:
-            return "00:00:00"
-        total_seconds = int((datetime.now() - start).total_seconds())
-        h, rem = divmod(total_seconds, 3600)
+            # ADD THIS: Calculate total uptime (paused time + currently running time)
+            total_seconds = self.accumulated_uptime
+            if self.running and self.start_time:
+                total_seconds += (datetime.now() - self.start_time).total_seconds()
+                
+        h, rem = divmod(int(total_seconds), 3600)
         m, s = divmod(rem, 60)
         return f"{h:02d}:{m:02d}:{s:02d}"

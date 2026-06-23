@@ -42,7 +42,7 @@ class FlowTable(ctk.CTkFrame):
                  row_height: int = 44, font_key: str = "mono_md",
                  cell_pad: int = 8, separators: bool = False,
                  scrollable: bool = False, selectable: bool = False,
-                 on_select=None):
+                 on_select=None, max_rows: int = 0):
         super().__init__(parent, fg_color="transparent")
         self.app = app
         self.fonts = app.fonts
@@ -53,6 +53,9 @@ class FlowTable(ctk.CTkFrame):
         self.separators = separators
         self.selectable = selectable
         self.on_select = on_select
+        # max_rows=0 means unlimited (Overview's paginated table).
+        # Traffic page passes 500 so the scrollable body never grows unbounded.
+        self._max_rows = max_rows
 
         self._rows: list[ctk.CTkFrame] = []
         self._base_fills: list[str] = []
@@ -137,7 +140,7 @@ class FlowTable(ctk.CTkFrame):
         self._base_borders.append(base_border)
 
         if self.selectable:
-            self._bind_click(rf, index)
+            self._bind_click(rf, rf)   # bind to frame ref, not index
 
     def _build_cell(self, parent, cell, col_index, align, dim, pad) -> None:
         spec = cell if isinstance(cell, dict) else {"text": str(cell)}
@@ -185,11 +188,21 @@ class FlowTable(ctk.CTkFrame):
                      ).grid(row=0, column=col_index, sticky="nsew", padx=pad)
 
     # ── selection ────────────────────────────────────────────────────────
-    def _bind_click(self, widget, index: int) -> None:
+    def _bind_click(self, widget, row_frame: ctk.CTkFrame) -> None:
+        # Bind to the frame object, not a captured index. After push_row()
+        # drops old rows and re-grids the rest, _select_by_frame still
+        # finds the correct current position via self._rows.index().
         widget.configure(cursor="hand2")
-        widget.bind("<Button-1>", lambda _e, i=index: self.select(i))
+        widget.bind("<Button-1>", lambda _e, rf=row_frame: self._select_by_frame(rf))
         for child in widget.winfo_children():
-            self._bind_click(child, index)
+            self._bind_click(child, row_frame)
+
+    def _select_by_frame(self, row_frame: ctk.CTkFrame) -> None:
+        try:
+            index = self._rows.index(row_frame)
+        except ValueError:
+            return   # frame was dropped (max_rows trim) before click resolved
+        self.select(index)
 
     def select(self, index: int) -> None:
         if index == self._selected:
@@ -202,3 +215,34 @@ class FlowTable(ctk.CTkFrame):
                 rf.configure(fg_color=self._base_fills[i])
         if callable(self.on_select):
             self.on_select(index)
+
+    # ── live append ───────────────────────────────────────────────────────
+    def push_row(self, row: dict) -> None:
+        """
+        Append one row at runtime — used by TrafficPage.poll() to stream
+        live FlowEvents into the grid without rebuilding the whole table.
+
+        When max_rows > 0 and the table is full, the oldest row is destroyed
+        and remaining rows are shifted up one grid slot. Selection index is
+        adjusted so the highlighted row stays on the correct frame.
+        """
+        if self._max_rows and len(self._rows) >= self._max_rows:
+            oldest = self._rows.pop(0)
+            self._base_fills.pop(0)
+            self._base_borders.pop(0)
+            oldest.destroy()
+            for i, rf in enumerate(self._rows):
+                rf.grid(row=i, column=0, sticky="ew", pady=1)
+            if self._selected is not None:
+                self._selected = None if self._selected == 0 else self._selected - 1
+
+        self._build_row(row, len(self._rows))
+
+        if isinstance(self.body, ctk.CTkScrollableFrame):
+            self.after(15, self._scroll_to_bottom)
+
+    def _scroll_to_bottom(self) -> None:
+        try:
+            self.body._parent_canvas.yview_moveto(1.0)
+        except Exception:
+            pass

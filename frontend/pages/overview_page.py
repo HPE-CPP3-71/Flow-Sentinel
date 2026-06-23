@@ -91,8 +91,7 @@ class OverviewPage(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        TopBar(self, app, variant="dashboard",
-               on_stop=lambda: app.show_page("start")).grid(row=0, column=0, sticky="ew")
+        TopBar(self, app, variant="dashboard").grid(row=0, column=0, sticky="ew")
 
         mid = ctk.CTkFrame(self, fg_color="transparent")
         mid.grid(row=1, column=0, sticky="nsew")

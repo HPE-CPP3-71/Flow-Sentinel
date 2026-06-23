@@ -18,15 +18,13 @@ from frontend.components.logo import FlowLogo
 
 
 class TopBar(ctk.CTkFrame):
-    def __init__(self, parent, app, variant: str = "dashboard",
-                 on_start=None, on_stop=None):
+    def __init__(self, parent, app, variant: str = "dashboard", on_toggle=None):
         super().__init__(parent, fg_color=theme.COLORS["bg_header"],
                          corner_radius=0, height=64,
                          border_width=0)
         self.app = app
         self.fonts = app.fonts
-        self.on_start = on_start
-        self.on_stop = on_stop
+        self.on_toggle = on_toggle
 
         self.grid_propagate(False)
         self.grid_columnconfigure(0, weight=1)   # brand block — pushes actions right
@@ -61,23 +59,40 @@ class TopBar(ctk.CTkFrame):
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.grid(row=0, column=1, sticky="e", padx=(0, 24), pady=12)
 
-        ctk.CTkButton(
+        # Save as self.start_btn so we can disable it later
+        self.start_btn = ctk.CTkButton(
             actions, text="▶ Start", width=86, height=34,
             font=self.fonts["body_sm"], corner_radius=theme.RADIUS["button"],
-            command=self.on_start, **theme.BUTTON_VARIANTS["primary"],
-        ).pack(side="left", padx=(0, 8))
+            command=self.on_toggle, **theme.BUTTON_VARIANTS["primary"],
+        )
+        self.start_btn.pack(side="left", padx=(0, 8))
 
-        ctk.CTkButton(
+        # Save as self.stop_btn so we can disable it later
+        self.stop_btn = ctk.CTkButton(
             actions, text="□ Stop", width=80, height=34,
             font=self.fonts["body_sm"], corner_radius=theme.RADIUS["button"],
-            command=self.on_stop, **theme.BUTTON_VARIANTS["outlined"],
-        ).pack(side="left", padx=(0, 14))
+            command=self.on_toggle, **theme.BUTTON_VARIANTS["outlined"],
+        )
+        self.stop_btn.pack(side="left", padx=(0, 14))
 
         # thin divider between the controls and the settings gear
         ctk.CTkFrame(actions, fg_color=theme.COLORS["border"], width=1, height=26
                      ).pack(side="left", padx=(0, 14))
 
         self._icon_button(actions, "⚙").pack(side="left")
+
+    # ── UI State Control Methods ─────────────────────────────────────────
+    def set_running(self) -> None:
+        """Called when capture resumes. Dims Start, lights up Stop."""
+        if hasattr(self, "start_btn"):
+            self.start_btn.configure(state="disabled", fg_color="transparent", text_color=theme.COLORS["text_muted"])
+            self.stop_btn.configure(state="normal", **theme.BUTTON_VARIANTS["outlined"])
+
+    def set_paused(self) -> None:
+        """Called when capture pauses. Lights up Start, dims Stop."""
+        if hasattr(self, "start_btn"):
+            self.start_btn.configure(state="normal", **theme.BUTTON_VARIANTS["primary"])
+            self.stop_btn.configure(state="disabled", fg_color="transparent", border_width=1, text_color=theme.COLORS["text_muted"])
 
     # ── helpers ──────────────────────────────────────────────────────────
     def _icon_button(self, parent, glyph: str) -> ctk.CTkButton:

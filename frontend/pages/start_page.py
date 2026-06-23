@@ -9,7 +9,8 @@ status line.
 Clicking Start hands the chosen interface to app.on_start (the backend
 hook supplied by main.py) and routes to the Overview frame.
 """
-
+import os
+import socket
 import customtkinter as ctk
 
 from frontend import theme
@@ -18,14 +19,21 @@ from frontend.components.logo import FlowLogo
 from frontend.components.start_button import StartButton
 from frontend.components.topbar import TopBar
 
-# Placeholder interface list — the real list would come from the backend.
-INTERFACES = [
-    "eth0 (Primary - 10Gbps)",
-    "enp0s8 (Secondary - 1Gbps)",
-    "wlan0 (Wireless)",
-    "lo (Loopback)",
-]
-
+def get_network_interfaces() -> list[str]:
+    """Attempts to dynamically detect local network interfaces."""
+    try:
+        # Linux is the primary target for NFStreamer raw sockets
+        if os.path.exists('/sys/class/net/'):
+            ifaces = os.listdir('/sys/class/net/')
+            # Sort them so common live interfaces (enp, eth, wlan) appear first
+            return sorted(ifaces, key=lambda x: (not (x.startswith('e') or x.startswith('w')), x))
+        
+        # Fallback for macOS / BSD
+        return [iface[1] for iface in socket.if_nameindex()]
+    except Exception:
+        print("Network interfaces were not detected!!")
+        # Absolute fallback if system calls fail
+        return ["eth0", "enp0s8", "wlan0", "lo"]
 
 class StartPage(ctk.CTkFrame):
     def __init__(self, parent, app):
@@ -107,9 +115,11 @@ class StartPage(ctk.CTkFrame):
         ctk.CTkLabel(picker, text="SELECT NETWORK INTERFACE", font=self.fonts["label_sm"],
                      text_color=theme.COLORS["text_muted"]
                      ).grid(row=0, column=0, sticky="w", padx=20, pady=(18, 8))
-        self.interface_var = ctk.StringVar(value=INTERFACES[0])
+        
+        detected_interfaces = get_network_interfaces()
+        self.interface_var = ctk.StringVar(value=detected_interfaces[0] if detected_interfaces else "enp0s8")
         ctk.CTkOptionMenu(
-            picker, variable=self.interface_var, values=INTERFACES,
+            picker, variable=self.interface_var, values=detected_interfaces,
             font=self.fonts["mono_md"], dropdown_font=self.fonts["mono_md"],
             height=46, corner_radius=10,
             fg_color=theme.COLORS["bg_card"], button_color=theme.COLORS["bg_card"],
@@ -148,4 +158,4 @@ class StartPage(ctk.CTkFrame):
                 self.app.on_start(self.app.app_state, interface)
             except Exception as exc:  # backend may be unavailable in UI-only runs
                 print(f"[StartPage] pipeline start failed (UI placeholder): {exc}")
-        self.app.show_page("overview")
+        self.app.show_page("traffic")
