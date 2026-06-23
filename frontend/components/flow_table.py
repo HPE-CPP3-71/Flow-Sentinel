@@ -60,7 +60,12 @@ class FlowTable(ctk.CTkFrame):
         self._rows: list[ctk.CTkFrame] = []
         self._base_fills: list[str] = []
         self._base_borders: list[str] = []
+        # Per-row list of per-column widget descriptors, so update_data() can
+        # reconfigure cells in place (no destroy/recreate → no flicker).
+        self._row_cells: list[list[dict]] = []
         self._selected: int | None = None
+        self._bold_font = ctk.CTkFont(family=self.cell_font.cget("family"),
+                                      size=self.cell_font.cget("size"), weight="bold")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -123,13 +128,15 @@ class FlowTable(ctk.CTkFrame):
         rf.grid_rowconfigure(0, weight=1)
         dim = row.get("_dim", False)
         ncols = len(self.columns)
+        cells: list[dict] = []
         for c, col in enumerate(self.columns):
             cell = row.get(col["key"], "")
             # inset the first/last cells so content never sits on the row's
             # rounded corners / vertical border edges
             left = 14 if c == 0 else 0
             right = 14 if c == ncols - 1 else self.cell_pad
-            self._build_cell(rf, cell, c, col.get("align", "w"), dim, (left, right))
+            cells.append(self._build_cell(rf, cell, c, col.get("align", "w"),
+                                          dim, (left, right)))
 
         if self.separators:
             ctk.CTkFrame(rf, fg_color=theme.COLORS["border_subtle"], height=2
@@ -138,11 +145,12 @@ class FlowTable(ctk.CTkFrame):
         self._rows.append(rf)
         self._base_fills.append(fill)
         self._base_borders.append(base_border)
+        self._row_cells.append(cells)
 
         if self.selectable:
             self._bind_click(rf, rf)   # bind to frame ref, not index
 
-    def _build_cell(self, parent, cell, col_index, align, dim, pad) -> None:
+    def _build_cell(self, parent, cell, col_index, align, dim, pad) -> dict:
         spec = cell if isinstance(cell, dict) else {"text": str(cell)}
         text = spec.get("text", "")
         font = self.cell_font
@@ -155,13 +163,14 @@ class FlowTable(ctk.CTkFrame):
         if spec.get("badge"):
             holder = ctk.CTkFrame(parent, fg_color="transparent")
             holder.grid(row=0, column=col_index, sticky="ew", padx=pad)
-            ctk.CTkLabel(
+            pill = ctk.CTkLabel(
                 holder, text=f" {text} ", font=self.fonts["mono_xs"],
                 fg_color=spec.get("badge_fg", theme.COLORS["badge_bg"]),
                 text_color=spec.get("badge_text", theme.COLORS["badge_text"]),
                 corner_radius=6, height=22,
-            ).pack(side=side)
-            return
+            )
+            pill.pack(side=side)
+            return {"kind": "badge", "label": pill}
 
         # Status dot + text (and/or trailing glyph pinned right)
         if spec.get("dot") or spec.get("trailing"):
@@ -173,19 +182,21 @@ class FlowTable(ctk.CTkFrame):
                              ).pack(side="right", padx=(8, 4))
             inner = ctk.CTkFrame(holder, fg_color="transparent")
             inner.pack(side=side)
+            dot_lbl = None
             if spec.get("dot"):
-                ctk.CTkLabel(inner, text="●", font=self.fonts["mono_xs"],
-                             text_color=color if dim else spec["dot"]
-                             ).pack(side="left", padx=(0, 7))
-            ctk.CTkLabel(inner, text=text, font=font, text_color=color).pack(side="left")
-            return
+                dot_lbl = ctk.CTkLabel(inner, text="●", font=self.fonts["mono_xs"],
+                                       text_color=color if dim else spec["dot"])
+                dot_lbl.pack(side="left", padx=(0, 7))
+            text_lbl = ctk.CTkLabel(inner, text=text, font=font, text_color=color)
+            text_lbl.pack(side="left")
+            return {"kind": "dotted", "text": text_lbl, "dot": dot_lbl}
 
         # Plain cell
         if spec.get("bold"):
-            font = ctk.CTkFont(family=font.cget("family"), size=font.cget("size"),
-                               weight="bold")
-        ctk.CTkLabel(parent, text=text, font=font, text_color=color, anchor=align,
-                     ).grid(row=0, column=col_index, sticky="nsew", padx=pad)
+            font = self._bold_font
+        lbl = ctk.CTkLabel(parent, text=text, font=font, text_color=color, anchor=align)
+        lbl.grid(row=0, column=col_index, sticky="nsew", padx=pad)
+        return {"kind": "plain", "label": lbl}
 
     # ── selection ────────────────────────────────────────────────────────
     def _bind_click(self, widget, row_frame: ctk.CTkFrame) -> None:
@@ -216,6 +227,98 @@ class FlowTable(ctk.CTkFrame):
         if callable(self.on_select):
             self.on_select(index)
 
+    # ── in-place refresh (no flicker) ─────────────────────────────────────
+    def update_data(self, new_rows: list[dict]) -> None:
+        """
+        Reconcile the table against `new_rows` by reconfiguring existing row
+        widgets in place. Rows are only created/destroyed when the row *count*
+        changes; otherwise nothing is rebuilt, so periodic refreshes don't
+        flicker. Used by the Overview "Live Capture Stats" table.
+        """
+        n_new = len(new_rows)
+
+        # Trim surplus rows from the end.
+        while len(self._rows) > n_new:
+            rf = self._rows.pop()
+            self._base_fills.pop()
+            self._base_borders.pop()
+            self._row_cells.pop()
+            rf.destroy()
+        if self._selected is not None and self._selected >= n_new:
+            self._selected = None
+
+        # Update the rows that already exist, in place.
+        common = len(self._rows)
+        for i in range(common):
+            if not self._update_row_inplace(i, new_rows[i]):
+                self._rebuild_all(new_rows)   # structural change → safe fallback
+                return
+
+        # Append any extra rows.
+        for i in range(common, n_new):
+            self._build_row(new_rows[i], i)
+
+    def _update_row_inplace(self, i: int, row: dict) -> bool:
+        """Reconfigure row i to match `row`. Returns False if a cell's widget
+        kind changed (then the caller rebuilds — never happens for stable
+        column layouts like the Overview table)."""
+        new_fill = row.get("_fill") or "transparent"
+        if new_fill != self._base_fills[i]:
+            base_border = new_fill if new_fill != "transparent" else theme.COLORS["bg_card"]
+            self._base_fills[i] = new_fill
+            self._base_borders[i] = base_border
+            if self._selected != i:
+                self._rows[i].configure(fg_color=new_fill, border_color=base_border)
+            else:
+                self._rows[i].configure(border_color=base_border)
+
+        dim = row.get("_dim", False)
+        descs = self._row_cells[i]
+        for c, col in enumerate(self.columns):
+            cell = row.get(col["key"], "")
+            spec = cell if isinstance(cell, dict) else {"text": str(cell)}
+            if self._cell_kind(spec) != descs[c]["kind"]:
+                return False
+            self._apply_cell_inplace(descs[c], spec, dim)
+        return True
+
+    @staticmethod
+    def _cell_kind(spec: dict) -> str:
+        if spec.get("badge"):
+            return "badge"
+        if spec.get("dot") or spec.get("trailing"):
+            return "dotted"
+        return "plain"
+
+    def _apply_cell_inplace(self, desc: dict, spec: dict, dim: bool) -> None:
+        color = spec.get("color", theme.COLORS["text_body"])
+        if dim:
+            color = spec.get("dim_color", theme.COLORS["text_muted"])
+        kind = desc["kind"]
+        if kind == "plain":
+            font = self._bold_font if spec.get("bold") else self.cell_font
+            desc["label"].configure(text=spec.get("text", ""), text_color=color, font=font)
+        elif kind == "badge":
+            desc["label"].configure(
+                text=f" {spec.get('text', '')} ",
+                fg_color=spec.get("badge_fg", theme.COLORS["badge_bg"]),
+                text_color=spec.get("badge_text", theme.COLORS["badge_text"]))
+        else:  # dotted
+            desc["text"].configure(text=spec.get("text", ""), text_color=color)
+            if desc["dot"] is not None and spec.get("dot"):
+                desc["dot"].configure(text_color=color if dim else spec["dot"])
+
+    def _rebuild_all(self, rows: list[dict]) -> None:
+        for rf in self._rows:
+            rf.destroy()
+        self._rows.clear()
+        self._base_fills.clear()
+        self._base_borders.clear()
+        self._row_cells.clear()
+        self._selected = None
+        for i, row in enumerate(rows):
+            self._build_row(row, i)
+
     # ── live append ───────────────────────────────────────────────────────
     def push_row(self, row: dict) -> None:
         """
@@ -230,6 +333,7 @@ class FlowTable(ctk.CTkFrame):
             oldest = self._rows.pop(0)
             self._base_fills.pop(0)
             self._base_borders.pop(0)
+            self._row_cells.pop(0)
             oldest.destroy()
             for i, rf in enumerate(self._rows):
                 rf.grid(row=i, column=0, sticky="ew", pady=1)

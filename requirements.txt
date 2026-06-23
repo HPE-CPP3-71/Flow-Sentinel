@@ -1,0 +1,15 @@
+## Flow-Sentinel Python dependencies
+# Note: `tkinter` is part of the Python standard library (OS package),
+# and `customtkinter` is the pip package used for the UI.
+
+customtkinter
+nfstream
+joblib
+numpy
+pandas
+scikit-learn
+xgboost
+
+# Optional / troubleshooting helpers (unpin to let pip resolve compatible versions)
+# matplotlib
+# python-dateutil

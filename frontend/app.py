@@ -30,6 +30,14 @@ class App(ctk.CTk):
         self.on_start = on_start
 
         ctk.set_appearance_mode("dark")
+
+        # Centralized adaptive scaling — the single place UI scale is decided.
+        # Must run before geometry()/minsize() so the window scales too, and
+        # before building widgets/fonts so they pick up the factor. Derived
+        # dynamically from DPI + screen resolution (see theme.compute_scaling);
+        # no hardcoded scaling value anywhere else in the app.
+        self.ui_scale = theme.init_scaling(self)
+
         self.configure(fg_color=theme.COLORS["bg_app"])
         self.title("FlowSentinel")
         self.geometry("1360x860")

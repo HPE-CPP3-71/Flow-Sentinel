@@ -68,6 +68,11 @@ class AppState:
         self.total_bytes: int = 0
         self.anomalies: int = 0
 
+        # Cumulative count of every flow processed since the app started.
+        # Monotonic — never reset or decremented, even when older flows fall
+        # out of the bounded flow_log. Backs the Overview "Total Flows" card.
+        self.total_flows: int = 0
+
         # NOTE: active_flows is intentionally left at 0 here. A true "flows
         # currently open" count needs NFStreamer's on_init/on_expire hooks
         # (a flow is "active" between those two callbacks), which means
@@ -99,6 +104,7 @@ class AppState:
         with self.lock:
             self.total_packets += event.packets
             self.total_bytes += event.bytes
+            self.total_flows += 1
             if event.is_anomaly:
                 self.anomalies += 1
             self.flow_log.append(event)
@@ -133,12 +139,22 @@ class AppState:
             pass
         return events
 
+    def get_flow_log_snapshot(self) -> List[FlowEvent]:
+        """
+        Thread-safe full copy of the rolling flow history, for the Overview
+        table and the CSV export. Copying under the lock avoids reading the
+        deque mid-append; cheap enough to call once per GUI poll tick.
+        """
+        with self.lock:
+            return list(self.flow_log)
+
     def snapshot_counters(self) -> Dict[str, object]:
         """Thread-safe read of the aggregate counters, for the stat cards."""
         with self.lock:
             return {
                 "total_packets": self.total_packets,
                 "total_bytes": self.total_bytes,
+                "total_flows": self.total_flows,
                 "anomalies": self.anomalies,
                 "active_flows": self.active_flows,
                 "running": self.running,

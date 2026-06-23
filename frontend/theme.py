@@ -214,6 +214,79 @@ SPACING = {"xs": 4, "sm": 8, "md": 16, "lg": 24, "xl": 32}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Adaptive scaling — the single source of truth for UI scale
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# CustomTkinter scales every widget size AND every CTkFont by a global factor
+# (effective = OS-DPI-scaling × widget-scaling-factor), so applying one factor
+# here is enough to keep the whole UI — layout, components and typography —
+# proportional. No per-page font or size hacks are needed.
+#
+# Reference design point: 1080p at 100% OS scaling → factor 1.0 (the size the
+# Figma was drawn at).
+
+# Design resolution the layout/proportions were authored against.
+_REF_WIDTH = 1920
+_REF_HEIGHT = 1080
+# Clamp so the factor never collapses tiny or blows up on unusual displays.
+_MIN_SCALE = 1.0
+_MAX_SCALE = 2.0
+
+
+def compute_scaling(root) -> float:
+    """
+    Derive a UI scale factor dynamically — no hardcoded constant.
+
+    Strategy:
+      * If the OS already reports HiDPI scaling (e.g. Windows display scaling),
+        trust it and stay at 1.0 — the OS preference already sizes the UI
+        correctly (this is the path the Windows host takes today).
+      * If the OS reports no scaling (≈1.0) — typical on Linux / a VirtualBox
+        VM with a high *virtual* resolution — derive the factor from the screen
+        resolution so the UI doesn't render tiny. Smaller displays stay at 1.0.
+
+    Because CTk's effective scale is OS-DPI × widget-factor, returning
+    target/os_dpi for the widget factor makes the *effective* scale land on the
+    intended target on every platform.
+    """
+    try:
+        from customtkinter import ScalingTracker
+        os_dpi = ScalingTracker.get_window_dpi_scaling(root)
+    except Exception:
+        os_dpi = 1.0
+
+    if os_dpi > 1.05:
+        # OS-driven scaling is present and authoritative — don't double-scale.
+        return 1.0
+
+    try:
+        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    except Exception:
+        return 1.0
+
+    # Fit-to-reference ratio; min() so neither axis overshoots.
+    ratio = min(sw / _REF_WIDTH, sh / _REF_HEIGHT)
+    return round(max(_MIN_SCALE, min(ratio, _MAX_SCALE)), 3)
+
+
+def init_scaling(root) -> float:
+    """
+    Compute the adaptive factor and apply it once, globally, to CustomTkinter.
+    Call exactly once from App.__init__ (right after super().__init__(), before
+    geometry() so the window size scales too). Returns the factor for logging.
+    """
+    factor = compute_scaling(root)
+    ctk.set_widget_scaling(factor)   # widget sizes + fonts
+    ctk.set_window_scaling(factor)   # geometry() / minsize() values
+    try:
+        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    except Exception:
+        sw = sh = 0
+    logger.info("UI scaling: screen=%dx%d -> factor=%.3f", sw, sh, factor)
+    return factor
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Fonts — must be built after a Tk root exists, hence a function not a constant
 # ═══════════════════════════════════════════════════════════════════════════
 

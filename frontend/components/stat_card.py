@@ -43,16 +43,34 @@ class StatCard(ctk.CTkFrame):
         # ── Value row: big number (+ optional unit / badge) ──────────────
         value_row = ctk.CTkFrame(self, fg_color="transparent")
         value_row.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 20))
-        ctk.CTkLabel(
+        # Stored so the Overview poll can update the figure in place rather
+        # than rebuilding the card.
+        self.value_lbl = ctk.CTkLabel(
             value_row, text=value, font=self.fonts["stat_value"],
             text_color=theme.COLORS["danger"] if danger else theme.COLORS["text_headline"],
-        ).pack(side="left")
+        )
+        self.value_lbl.pack(side="left")
         if unit:
-            ctk.CTkLabel(value_row, text=f" {unit}", font=self.fonts["body_md"],
-                         text_color=theme.COLORS["text_muted"]).pack(side="left", pady=(8, 0))
+            # Stored too — bandwidth flips its unit (Gbps ⇄ Mbps) at runtime.
+            self.unit_lbl = ctk.CTkLabel(value_row, text=f" {unit}", font=self.fonts["body_md"],
+                                         text_color=theme.COLORS["text_muted"])
+            self.unit_lbl.pack(side="left", pady=(8, 0))
         if badge:
             ctk.CTkLabel(
                 value_row, text=f" {badge} ", font=self.fonts["mono_xs"],
                 text_color=theme.COLORS["danger_text"], fg_color="#3a1a1f",
                 corner_radius=6, height=20,
             ).pack(side="left", padx=(10, 0))
+
+    # ── live update ──────────────────────────────────────────────────────
+    def update_value(self, value: str, unit: str = "") -> None:
+        """
+        Update the figure (and unit, if this card has one) in place.
+
+        Named update_value, not update, on purpose: CTk/Tk widgets already have
+        a built-in .update() that pumps the event loop, and shadowing it breaks
+        internal redraw calls.
+        """
+        self.value_lbl.configure(text=value)
+        if unit and hasattr(self, "unit_lbl"):
+            self.unit_lbl.configure(text=f" {unit}")
