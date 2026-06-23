@@ -8,7 +8,7 @@ mono column; long feature/value pairs wrap onto a second right-aligned line
 instead of clipping (matching the Figma).
 
 The panel is live: TrafficPage calls `update(features)` when a row in the
-Flow Predictions table is selected, and `reset()` (placeholder values) when
+Flow Predictions table is selected, and `reset()` (empty state) when
 nothing is selected.
 """
 
@@ -16,23 +16,8 @@ import customtkinter as ctk
 
 from frontend import theme
 
-# Placeholder rows — the TCP_KEY_FEATURES order from backend/pipeline.py,
-# shown until a flow is selected.
-PLACEHOLDER = {
-    "src2dst_psh_packets": "0",
-    "dst2src_rst_packets": "0",
-    "dst2src_psh_packets": "0",
-    "RST Flag Cnt": "0",
-    "PSH Flag Cnt": "0",
-    "dst2src_stddev_ps": "0.0",
-    "bidirectional_stddev_ps": "188.09040379562165",
-    "Pkt Len Var": "35378.00000000001",
-    "src2dst_min_ps": "282",
-    "bidirectional_mean_ps": "415.0",
-    "bidirectional_max_ps": "548",
-    "udps.fwd_seg_size_min": "28",
-    "udps.init_fwd_win": "-1",
-}
+# FIX 1: Removed the hardcoded dummy values. Now defaults to an empty dict.
+PLACEHOLDER = {}
 
 _WRAP_THRESHOLD = 30   # name+value chars above which the value wraps to line 2
 
@@ -69,8 +54,9 @@ class FeaturePanel(ctk.CTkFrame):
                      ).grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 6))
 
         # ── Body (rebuilt by update / reset) ─────────────────────────────
-        self.body = ctk.CTkFrame(self, fg_color="transparent")
-        self.body.grid(row=2, column=0, sticky="nsew", padx=20, pady=(2, 14))
+        # FIX 2: Changed from CTkFrame to CTkScrollableFrame
+        self.body = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.body.grid(row=2, column=0, sticky="nsew", padx=(20, 10), pady=(2, 14)) # Slightly adjusted right padding for the scrollbar
         self.body.grid_columnconfigure(0, weight=1)
 
         self._render(features or PLACEHOLDER)
@@ -84,8 +70,19 @@ class FeaturePanel(ctk.CTkFrame):
 
     # ── rendering ────────────────────────────────────────────────────────
     def _render(self, features: dict) -> None:
+        # Clear out existing children
         for child in self.body.winfo_children():
             child.destroy()
+            
+        # FIX 1 (cont): Show a clean empty state if no flow is selected
+        if not features:
+            ctk.CTkLabel(self.body, text="Select a flow to view features...", 
+                         font=self.fonts["mono_md"], 
+                         text_color=theme.COLORS["text_muted"]
+                         ).pack(pady=40)
+            return
+
+        # Render features if they exist
         for name, value in features.items():
             self._add_row(name, str(value))
 
