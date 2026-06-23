@@ -94,11 +94,11 @@ def load_models(models_dir: str) -> Models:
         fcols=joblib.load(f"{base}/feature_columns3.pkl"),
     )
     logger.info("[ICMP] %d features | classes: %s", len(icmp.fcols), list(icmp.le.classes_))
-
+    base = os.path.join(models_dir, "TCP")
     tcp = ModelBundle(
-        model=joblib.load(f"{base}/tcp_model2.pkl"),
-        le=joblib.load(f"{base}/tcp_label_encoder2.pkl"),
-        fcols=joblib.load(f"{base}/tcp_feature_columns2.pkl"),
+        model=joblib.load(f"{base}/tcp_final_model.pkl"),
+        le=joblib.load(f"{base}/tcp_final_label_encoder.pkl"),
+        fcols=joblib.load(f"{base}/tcp_final_features.pkl"),
     )
     logger.info("[TCP ] %d features | classes: %s", len(tcp.fcols), list(tcp.le.classes_))
 
