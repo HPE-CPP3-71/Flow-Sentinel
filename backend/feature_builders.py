@@ -447,3 +447,31 @@ def build_dns_row(flow):
     }
 
     return row
+
+def build_igmp_row(flow):
+    """
+    Feature dict for the IGMP anomaly model (IGMP churn / flood detection).
+    Optimized to extract only the strict final feature set to match the XGBoost model.
+    """
+    # Calculate duration in seconds (floored at 0.5s to prevent division by zero)
+    dur = max(flow.bidirectional_duration_ms / 1000.0, 0.5)
+    
+    return {
+        # ── Time & Volume ───────────────────────────────────────────
+        "bidirectional_duration_ms":    flow.bidirectional_duration_ms,
+        "bidirectional_packets":        flow.bidirectional_packets,
+        
+        # ── Microscopic Timing Variance (PIAT) ──────────────────────
+        "bidirectional_min_piat_ms":    flow.bidirectional_min_piat_ms,
+        "bidirectional_mean_piat_ms":   flow.bidirectional_mean_piat_ms,
+        "bidirectional_stddev_piat_ms": flow.bidirectional_stddev_piat_ms,
+        "bidirectional_max_piat_ms":    flow.bidirectional_max_piat_ms,
+        
+        # ── Packet Header & Segment Constraints ─────────────────────
+        "udps.fwd_header_len":          _udps(flow, 'fwd_header_len', 0),
+        "udps.fwd_seg_size_min":        _udps(flow, 'fwd_seg_size_min', 0),
+        
+        # ── Derived Velocity & Algorithmic Rhythm ───────────────────
+        "Fwd Pkts/s":                   flow.src2dst_packets / dur,
+        "Fwd IAT CV":                   _safe_div(flow.src2dst_stddev_piat_ms, flow.src2dst_mean_piat_ms)
+    }

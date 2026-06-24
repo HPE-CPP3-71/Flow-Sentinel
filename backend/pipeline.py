@@ -27,7 +27,7 @@ from typing import Dict, List, Optional
 import joblib
 from nfstream import NFStreamer
 
-from backend.feature_builders import build_icmp_row, build_dns_row,build_tcp_row, dump_full_flow
+from backend.feature_builders import build_icmp_row, build_dns_row, build_tcp_row, build_igmp_row, dump_full_flow
 from backend.plugins import (
     ActiveIdlePlugin,
     BulkPlugin,
@@ -37,7 +37,10 @@ from backend.plugins import (
     FlowEntropyPlugin,
     QueryLengthPlugin,
 )
+from backend import rule_based
+from backend.rule_based import IGMPAlertPlugin, OSPFAlertPlugin, PIMAlertPlugin
 from backend.predictor import run_prediction
+from core.config import CONFIG
 from core.events import FlowEvent
 from core.state import AppState
 
@@ -49,8 +52,16 @@ logger = logging.getLogger(__name__)
 DEBUG_DUMP_CSV = False
 DEBUG_DUMP_PATH = "/tmp/live_flows_dump.csv"
 
-_PROTOCOL_NAMES = {1: "ICMP", 6: "TCP", 17: "UDP"}
-_BENIGN_LABELS = {"BENIGN", "G_BENIGN"}
+_PROTOCOL_NAMES = {1: "ICMP", 6: "TCP", 17: "UDP", 2: "IGMP", 89: "OSPF", 103: "PIM"}
+# "Benign" (capitalised) is the IGMP model's benign class — distinct from the
+# ICMP/TCP "BENIGN"/"G_BENIGN". All three must be treated as non-anomalous.
+_BENIGN_LABELS = {"BENIGN", "G_BENIGN", "Benign"}
+
+# Rule-based events use a single Model tag and a fixed confidence; multiple rule
+# violations on one flow are joined into one prediction string with this delimiter.
+RULE_MODEL_TAG = "RULE-BASED"
+RULE_CONFIDENCE = 1.0
+RULE_VERDICT_DELIM = " | "
 
 # Small curated feature subset shown in the Traffic page's "TCP Model
 # Features" panel — same list you were printing in main.py. The full
@@ -89,6 +100,7 @@ class ModelBundle:
 class Models:
     icmp: ModelBundle
     tcp: ModelBundle
+    igmp: Optional[ModelBundle] = None
     dns: Optional[ModelBundle] = None   # not trained yet — see module docstring
 
 
@@ -113,6 +125,13 @@ def load_models(models_dir: str) -> Models:
         fcols=joblib.load(f"{base}/tcp_final_features.pkl"),
     )
     logger.info("[TCP ] %d features | classes: %s", len(tcp.fcols), list(tcp.le.classes_))
+    base = os.path.join(models_dir, "IGMP")
+    igmp = ModelBundle(
+        model=joblib.load(f"{base}/igmp_xgboost_model2.pkl"),
+        le=joblib.load(f"{base}/igmp_label_encoder2.pkl"),
+        fcols=joblib.load(f"{base}/igmp_feature_columns2.pkl"),
+    )
+    logger.info("[IGMP] %d features | classes: %s", len(igmp.fcols), list(igmp.le.classes_))
 
     base = os.path.join(models_dir, "DNS")
     dns = ModelBundle(
@@ -122,7 +141,7 @@ def load_models(models_dir: str) -> Models:
     )
     logger.info("[DNS ] %d features | classes: %s", len(dns.fcols), list(dns.le.classes_))
 
-    return Models(icmp=icmp, tcp=tcp, dns=dns)
+    return Models(icmp=icmp, tcp=tcp, igmp=igmp, dns=dns)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -227,19 +246,109 @@ def _process_tcp(flow, ts: str, models: Models) -> FlowEvent:
     return _build_event(ts, "TCP/UDP", flow, pred, conf, key_features)
 
 
-def process_flow(flow, models: Models) -> Optional[FlowEvent]:
-    """Routes a single NFStream flow to the right model branch."""
+# ── Rule-based branches (IGMP rules / OSPF / PIM) ────────────────────────────
+
+def _rule_key_features(verdicts: List[str], info: Dict[str, object]) -> Dict[str, object]:
+    """
+    Detection Details payload for a rule-based event: the individual triggered
+    rules (numbered, readable) followed by whatever supporting values the plugin
+    actually captured. Nothing is fabricated — `info` only holds measured data.
+    """
+    key_features: Dict[str, object] = {}
+    if verdicts:
+        for i, verdict in enumerate(verdicts, 1):
+            key_features[f"Rule {i}"] = verdict
+    else:
+        key_features["Verdict"] = "BENIGN"
+    key_features.update(info)
+    return key_features
+
+
+def _build_rule_event(ts: str, flow, verdicts: List[str],
+                      info: Dict[str, object]) -> FlowEvent:
+    """One FlowEvent for a rule-based flow. Multiple verdicts → one joined
+    prediction string → one row. Benign (no verdict) → "BENIGN"."""
+    prediction = RULE_VERDICT_DELIM.join(verdicts) if verdicts else "BENIGN"
+    return _build_event(ts, RULE_MODEL_TAG, flow, prediction, RULE_CONFIDENCE,
+                        _rule_key_features(verdicts, info))
+
+
+def _process_igmp(flow, ts: str, models: Models) -> List[FlowEvent]:
+    """
+    Strict separation — NO IGMP packet is analysed by both systems:
+
+      • Type 0x11 present (igmp_query_count > 0): router-side Membership Query
+        traffic → RULE ENGINE ONLY. Never builds ML features or runs ML.
+        Always emits exactly one RULE-BASED row (benign, or the aggregated
+        verdicts when one or more query rules fired).
+
+      • No Type 0x11 (only reports/leaves): host-side multicast membership
+        traffic → IGMP ML MODEL ONLY. Emits one "IGMP" model event.
+
+    IGMP queries and reports are sourced/destined differently, so they form
+    separate NFStream flows — this flow-level split is exact in practice.
+    """
+    query_count = getattr(flow.udps, "igmp_query_count", 0)
+
+    # ── Router-side query traffic (Type 0x11) → rule engine only ──────────
+    if query_count > 0:
+        verdicts = list(getattr(flow.udps, "igmp_rule_verdicts", []))
+        info = dict(getattr(flow.udps, "igmp_info", {}))
+        info["Query Count"] = query_count
+        info["Flood IAT Threshold (s)"] = rule_based.IGMP_GENERAL_QUERY_FLOOD_IAT
+        return [_build_rule_event(ts, flow, verdicts, info)]
+
+    # ── Host-side report/leave traffic → IGMP ML model only ───────────────
+    if models.igmp is not None:
+        try:
+            row = build_igmp_row(flow)
+            pred, conf = run_prediction(models.igmp.model, models.igmp.le,
+                                        models.igmp.fcols, row)
+            key_features = dict(row)
+        except Exception as e:
+            pred, conf, key_features = f"ERR:{e}", 0.0, {}
+        return [_build_event(ts, "IGMP", flow, pred, conf, key_features)]
+
+    return []
+
+
+def _process_ospf(flow, ts: str, models: Models) -> List[FlowEvent]:
+    """OSPF is rule-only — always emit one event (benign or with verdicts)."""
+    verdicts = list(getattr(flow.udps, "ospf_verdicts", []))
+    info = dict(getattr(flow.udps, "ospf_info", {}))
+    return [_build_rule_event(ts, flow, verdicts, info)]
+
+
+def _process_pim(flow, ts: str, models: Models) -> List[FlowEvent]:
+    """PIM is rule-only — always emit one event (benign or with verdicts)."""
+    verdicts = list(getattr(flow.udps, "pim_verdicts", []))
+    info = dict(getattr(flow.udps, "pim_info", {}))
+    return [_build_rule_event(ts, flow, verdicts, info)]
+
+
+def process_flow(flow, models: Models) -> List[FlowEvent]:
+    """
+    Routes a single NFStream flow to the right branch(es). Returns a list so a
+    single flow can yield more than one event (e.g. an IGMP flow that both feeds
+    the ML model and trips a query rule). Empty list = nothing to record.
+    """
     ts = datetime.now().strftime("%H:%M:%S")
 
     if flow.protocol == 1:
-        return _process_icmp(flow, ts, models)
+        return [_process_icmp(flow, ts, models)]
+    elif flow.protocol == 2:
+        return _process_igmp(flow, ts, models)
+    elif flow.protocol == 89:
+        return _process_ospf(flow, ts, models)
+    elif flow.protocol == 103:
+        return _process_pim(flow, ts, models)
     elif flow.protocol == 17 and (flow.dst_port == 53 or flow.src_port == 53):
-        return _process_dns(flow, ts, models)
+        return [_process_dns(flow, ts, models)]
     elif flow.protocol in (6, 17):
-        return _process_tcp(flow, ts, models)
+        return [_process_tcp(flow, ts, models)]
     else:
-        logger.debug("Skipped non TCP/UDP/ICMP flow: protocol=%s", flow.protocol)
-        return None
+        logger.debug("Skipped unsupported flow: protocol=%s", flow.protocol)
+        return []
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -252,6 +361,11 @@ def run_pipeline(state: AppState, interface: str, models_dir: str) -> None:
     life of the capture — never call this from the GUI thread.
     """
     models = load_models(models_dir)
+
+    # Apply the user's tuned rule-engine thresholds for THIS capture. Reading
+    # them here (not at import) is what gives "changes take effect on the next
+    # capture" — an already-running capture keeps the values it started with.
+    _apply_rule_config()
 
     streamer = NFStreamer(
         source=interface,
@@ -268,6 +382,10 @@ def run_pipeline(state: AppState, interface: str, models_dir: str) -> None:
             FlowEntropyPlugin(),
             ExtraFeaturesPlugin(),
             ActiveIdlePlugin(idle_threshold_ms=5000),
+            # Rule-based signature detectors (IGMP / OSPF / PIM).
+            IGMPAlertPlugin(),
+            OSPFAlertPlugin(),
+            PIMAlertPlugin(),
         ],
     )
 
@@ -280,9 +398,23 @@ def run_pipeline(state: AppState, interface: str, models_dir: str) -> None:
             # idle_timeout=2 already configured, flows expire often enough
             # that Stop takes effect within a few seconds.
             break
-        event = process_flow(flow, models)
-        if event is not None:
+        for event in process_flow(flow, models):
             state.record(event)
 
     state.stop()
     logger.info("Pipeline stopped.")
+
+
+def _apply_rule_config() -> None:
+    """Copy the persisted Settings values into the rule_based module globals so
+    the detectors pick them up for the upcoming capture."""
+    rule_based.IGMP_GENERAL_QUERY_FLOOD_IAT = CONFIG.get("IGMP_GENERAL_QUERY_FLOOD_IAT")
+    rule_based.OSPF_LSA_IAT_THRESHOLD = CONFIG.get("OSPF_LSA_IAT_THRESHOLD")
+    rule_based.OSPF_MAX_AGE_THRESHOLD = CONFIG.get("OSPF_MAX_AGE_THRESHOLD")
+    rule_based.OSPF_HELLO_IAT_THRESHOLD = CONFIG.get("OSPF_HELLO_IAT_THRESHOLD")
+    rule_based.PIM_HELLO_IAT_THRESHOLD = CONFIG.get("PIM_HELLO_IAT_THRESHOLD")
+    logger.info("Rule thresholds applied: IGMP_flood_iat=%.1f OSPF_lsa_iat=%.1f "
+                "OSPF_maxage=%.1f OSPF_hello_iat=%.1f PIM_hello_iat=%.1f",
+                rule_based.IGMP_GENERAL_QUERY_FLOOD_IAT, rule_based.OSPF_LSA_IAT_THRESHOLD,
+                rule_based.OSPF_MAX_AGE_THRESHOLD, rule_based.OSPF_HELLO_IAT_THRESHOLD,
+                rule_based.PIM_HELLO_IAT_THRESHOLD)

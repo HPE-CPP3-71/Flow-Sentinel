@@ -23,6 +23,7 @@ import math
 import customtkinter as ctk
 from customtkinter import ScalingTracker
 
+from core.config import CONFIG
 from core.events import FlowEvent
 from frontend import theme
 from frontend.components.flow_table import FlowTable
@@ -41,7 +42,15 @@ _COLUMNS = [
 
 _ROW_HEIGHT = 50
 _TABLE_HEADER_PX = 38   # column-title row + underline inside FlowTable
-_POLL_MS = 1000         # card + table refresh cadence
+_POLL_MS = 1000         # fallback cadence; live value comes from CONFIG
+
+
+def _refresh_ms() -> int:
+    """Overview poll cadence, from Settings (applies on the next tick)."""
+    try:
+        return max(100, int(CONFIG.get("OVERVIEW_REFRESH_MS")))
+    except Exception:
+        return _POLL_MS
 
 
 # ── formatting helpers ───────────────────────────────────────────────────
@@ -137,7 +146,7 @@ class OverviewPage(ctk.CTkFrame):
         # first paint once geometry has settled (Configure refines it after),
         # then the steady 1 s poll loop.
         self.after(60, self._render_table)
-        self._poll_job = self.after(_POLL_MS, self._poll)
+        self._poll_job = self.after(_refresh_ms(), self._poll)
 
     def _build_content(self, parent) -> ctk.CTkFrame:
         content = ctk.CTkFrame(parent, fg_color="transparent")
@@ -295,7 +304,7 @@ class OverviewPage(ctk.CTkFrame):
         self._apply_capture_state(counters["running"])
         self._render_table()
 
-        self._poll_job = self.after(_POLL_MS, self._poll)
+        self._poll_job = self.after(_refresh_ms(), self._poll)
 
     # ── height-aware rendering ───────────────────────────────────────────
     def _on_body_configure(self, event) -> None:
@@ -396,15 +405,18 @@ class OverviewPage(ctk.CTkFrame):
         if not path:
             return
 
-        columns = ["Source IP", "Destination IP", "Packet Count",
-                   "Protocol", "Prediction", "Confidence"]
+        # Same single export path for ML and RULE-BASED rows. Model + Byte Count
+        # are included so rule-based detections are fully represented and
+        # distinguishable from ML predictions in the exported file.
+        columns = ["Time", "Model", "Source IP", "Destination IP", "Packet Count",
+                   "Byte Count", "Protocol", "Prediction", "Confidence"]
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(columns)
                 for e in snapshot:
-                    writer.writerow([e.src_ip, e.dst_ip, e.packets,
-                                     e.protocol, e.prediction, f"{e.confidence:.4f}"])
+                    writer.writerow([e.ts, e.model_tag, e.src_ip, e.dst_ip, e.packets,
+                                     e.bytes, e.protocol, e.prediction, f"{e.confidence:.4f}"])
         except Exception as exc:
             messagebox.showerror("Export failed", str(exc))
             return

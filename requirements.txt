@@ -9,6 +9,9 @@ numpy
 pandas
 scikit-learn
 xgboost
+# OSPF rule-based detection parses packets with Scapy. Imported defensively in
+# backend/rule_based.py — the app still runs (OSPF detection disabled) if absent.
+scapy
 
 # Optional / troubleshooting helpers (unpin to let pip resolve compatible versions)
 # matplotlib

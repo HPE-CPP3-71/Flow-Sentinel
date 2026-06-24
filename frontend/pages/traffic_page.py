@@ -239,15 +239,19 @@ class TrafficPage(ctk.CTkFrame):
                 self.topbar.set_running()
     # ── row selection ─────────────────────────────────────────────────────
     def _on_row_select(self, index: int) -> None:
-        """Push the selected flow's feature dict into the FeaturePanel."""
+        """Push the selected flow's detail dict into the Detection Details panel.
+
+        Works for both ML rows (model feature read-outs) and RULE-BASED rows
+        (triggered rules + supporting values) — both arrive as key_features."""
         if 0 <= index < len(self._live_events):
             event = self._live_events[index]
             features = event.key_features
+            title = "Detection Details" if event.model_tag == "RULE-BASED" \
+                else f"Detection Details — {event.model_tag}"
+            self.feature_panel.title_label.configure(text=title)
             if features:
-                self.feature_panel.title_label.configure(text=f"--- {event.model_tag} Model Features ---")
                 self.feature_panel.update_features(features)
             else:
-                self.feature_panel.title_label.configure(text="--- Model Features ---")
                 self.feature_panel.reset()
 
     # ── poll loop — drains state.queue every _POLL_MS ────────────────────

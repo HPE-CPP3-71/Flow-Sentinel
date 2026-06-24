@@ -71,10 +71,12 @@ class App(ctk.CTk):
         from frontend.pages.start_page import StartPage
         from frontend.pages.overview_page import OverviewPage
         from frontend.pages.traffic_page import TrafficPage
+        from frontend.pages.settings_page import SettingsPage
 
         self.register_page("start", StartPage)
         self.register_page("overview", OverviewPage)
         self.register_page("traffic", TrafficPage)
+        self.register_page("settings", SettingsPage)
 
     def register_page(self, name: str, frame_class) -> None:
         """

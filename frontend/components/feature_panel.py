@@ -24,7 +24,7 @@ _WRAP_THRESHOLD = 30   # name+value chars above which the value wraps to line 2
 
 class FeaturePanel(ctk.CTkFrame):
     def __init__(self, parent, app, features: dict | None = None,
-                 title: str = "--- TCP Model Features ---"):
+                 title: str = "Detection Details"):
         super().__init__(parent, fg_color=theme.COLORS["bg_card"],
                          corner_radius=theme.RADIUS["card"],
                          border_width=1, border_color=theme.COLORS["border_subtle"])
