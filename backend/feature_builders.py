@@ -260,7 +260,6 @@ def build_dns_row(flow):
 
     dur = max(flow.bidirectional_duration_ms / 1000.0, 0.5)
 
-    # Directional TCP flags
     fwd_syn = getattr(flow, "src2dst_syn_packets", 0)
     bwd_syn = getattr(flow, "dst2src_syn_packets", 0)
 
@@ -286,126 +285,165 @@ def build_dns_row(flow):
     bwd_fin = getattr(flow, "dst2src_fin_packets", 0)
 
     row = {
-    "src_port": getattr(flow, "src_port", 0),
-    "dst_port": getattr(flow, "dst_port", 0),
-    "protocol": getattr(flow, "protocol", 0),
-    "ip_version": getattr(flow, "ip_version", 4),
-    "vlan_id": getattr(flow, "vlan_id", 0),
-    "tunnel_id": getattr(flow, "tunnel_id", 0),
 
-    "bidirectional_packets": flow.bidirectional_packets,
-    "bidirectional_bytes": flow.bidirectional_bytes,
+        "src_port": getattr(flow, "src_port", 0),
+        "dst_port": getattr(flow, "dst_port", 0),
+        "protocol": getattr(flow, "protocol", 0),
+        "ip_version": getattr(flow, "ip_version", 4),
+        "vlan_id": getattr(flow, "vlan_id", 0),
+        "tunnel_id": getattr(flow, "tunnel_id", 0),
 
-    "src2dst_packets": flow.src2dst_packets,
-    "dst2src_packets": flow.dst2src_packets,
+        "bidirectional_packets": getattr(flow, "bidirectional_packets", 0),
+        "bidirectional_bytes": getattr(flow, "bidirectional_bytes", 0),
 
-    "bidirectional_min_ps": flow.bidirectional_min_ps,
-    "bidirectional_mean_ps": flow.bidirectional_mean_ps,
-    "bidirectional_max_ps": flow.bidirectional_max_ps,
+        "src2dst_packets": getattr(flow, "src2dst_packets", 0),
 
-    "src2dst_mean_ps": flow.src2dst_mean_ps,
-    "src2dst_stddev_ps": flow.src2dst_stddev_ps,
-    "src2dst_max_ps": flow.src2dst_max_ps,
+        "src2dst_stddev_ps": getattr(flow, "src2dst_stddev_ps", 0),
+        "src2dst_max_ps": getattr(flow, "src2dst_max_ps", 0),
 
-    "dst2src_min_ps": flow.dst2src_min_ps,
-    "dst2src_mean_ps": flow.dst2src_mean_ps,
-    "dst2src_stddev_ps": flow.dst2src_stddev_ps,
+        "dst2src_stddev_ps": getattr(flow, "dst2src_stddev_ps", 0),
+        "dst2src_max_ps": getattr(flow, "dst2src_max_ps", 0),
 
-    "bidirectional_min_piat_ms": flow.bidirectional_min_piat_ms,
-    "bidirectional_mean_piat_ms": flow.bidirectional_mean_piat_ms,
-    "bidirectional_stddev_piat_ms": flow.bidirectional_stddev_piat_ms,
-    "bidirectional_max_piat_ms": flow.bidirectional_max_piat_ms,
+        "bidirectional_mean_piat_ms":
+            getattr(flow, "bidirectional_mean_piat_ms", 0),
 
-    "src2dst_min_piat_ms": flow.src2dst_min_piat_ms,
-    "src2dst_mean_piat_ms": flow.src2dst_mean_piat_ms,
-    "src2dst_stddev_piat_ms": flow.src2dst_stddev_piat_ms,
-    "src2dst_max_piat_ms": flow.src2dst_max_piat_ms,
+        "bidirectional_stddev_piat_ms":
+            getattr(flow, "bidirectional_stddev_piat_ms", 0),
 
-    "dst2src_min_piat_ms": flow.dst2src_min_piat_ms,
-    "dst2src_mean_piat_ms": flow.dst2src_mean_piat_ms,
-    "dst2src_stddev_piat_ms": flow.dst2src_stddev_piat_ms,
-    "dst2src_max_piat_ms": flow.dst2src_max_piat_ms,
+        "bidirectional_max_piat_ms":
+            getattr(flow, "bidirectional_max_piat_ms", 0),
 
-    "SYN Flag Cnt": fwd_syn + bwd_syn,
-    "CWE Flag Count": fwd_cwr + bwd_cwr,
-    "ECE Flag Cnt": fwd_ece + bwd_ece,
-    "URG Flag Cnt": fwd_urg + bwd_urg,
-    "ACK Flag Cnt": fwd_ack + bwd_ack,
-    "PSH Flag Cnt": fwd_psh + bwd_psh,
-    "RST Flag Cnt": fwd_rst + bwd_rst,
-    "FIN Flag Cnt": fwd_fin + bwd_fin,
+        "src2dst_min_piat_ms":
+            getattr(flow, "src2dst_min_piat_ms", 0),
 
-    "src2dst_syn_packets": fwd_syn,
-    "src2dst_cwr_packets": fwd_cwr,
-    "src2dst_ece_packets": fwd_ece,
-    "src2dst_urg_packets": fwd_urg,
-    "src2dst_ack_packets": fwd_ack,
-    "src2dst_psh_packets": fwd_psh,
-    "src2dst_rst_packets": fwd_rst,
-    "src2dst_fin_packets": fwd_fin,
+        "src2dst_mean_piat_ms":
+            getattr(flow, "src2dst_mean_piat_ms", 0),
 
-    "dst2src_syn_packets": bwd_syn,
-    "dst2src_cwr_packets": bwd_cwr,
-    "dst2src_ece_packets": bwd_ece,
-    "dst2src_urg_packets": bwd_urg,
-    "dst2src_ack_packets": bwd_ack,
-    "dst2src_psh_packets": bwd_psh,
-    "dst2src_rst_packets": bwd_rst,
-    "dst2src_fin_packets": bwd_fin,
+        "src2dst_stddev_piat_ms":
+            getattr(flow, "src2dst_stddev_piat_ms", 0),
 
-    "udps.fwd_byts_b_avg": _udps(flow, "fwd_byts_b_avg"),
-    "udps.fwd_pkts_b_avg": _udps(flow, "fwd_pkts_b_avg"),
-    "udps.fwd_blk_rate_avg": _udps(flow, "fwd_blk_rate_avg"),
+        "src2dst_max_piat_ms":
+            getattr(flow, "src2dst_max_piat_ms", 0),
 
-    "udps.bwd_byts_b_avg": _udps(flow, "bwd_byts_b_avg"),
-    "udps.bwd_pkts_b_avg": _udps(flow, "bwd_pkts_b_avg"),
-    "udps.bwd_blk_rate_avg": _udps(flow, "bwd_blk_rate_avg"),
+        "dst2src_min_piat_ms":
+            getattr(flow, "dst2src_min_piat_ms", 0),
 
-    "udps.fwd_header_len": _udps(flow, "fwd_header_len"),
-    "udps.bwd_header_len": _udps(flow, "bwd_header_len"),
+        "dst2src_mean_piat_ms":
+            getattr(flow, "dst2src_mean_piat_ms", 0),
 
-    "udps.init_fwd_win": _udps(flow, "init_fwd_win", -1),
-    "udps.init_bwd_win": _udps(flow, "init_bwd_win", -1),
+        "dst2src_stddev_piat_ms":
+            getattr(flow, "dst2src_stddev_piat_ms", 0),
 
-    "udps.fwd_act_data_pkts": _udps(flow, "fwd_act_data_pkts", 0),
-    "udps.fwd_seg_size_min": _udps(flow, "fwd_seg_size_min", 0),
+        "dst2src_max_piat_ms":
+            getattr(flow, "dst2src_max_piat_ms", 0),
 
-    "udps.active_mean": _udps(flow, "active_mean"),
-    "udps.active_std": _udps(flow, "active_std"),
-    "udps.active_max": _udps(flow, "active_max"),
-    "udps.active_min": _udps(flow, "active_min"),
+        "SYN Flag Cnt": fwd_syn + bwd_syn,
+        "CWE Flag Count": fwd_cwr + bwd_cwr,
+        "ECE Flag Cnt": fwd_ece + bwd_ece,
+        "URG Flag Cnt": fwd_urg + bwd_urg,
+        "ACK Flag Cnt": fwd_ack + bwd_ack,
+        "PSH Flag Cnt": fwd_psh + bwd_psh,
+        "RST Flag Cnt": fwd_rst + bwd_rst,
+        "FIN Flag Cnt": fwd_fin + bwd_fin,
 
-    "udps.idle_mean": _udps(flow, "idle_mean"),
-    "udps.idle_std": _udps(flow, "idle_std"),
-    "udps.idle_max": _udps(flow, "idle_max"),
-    "udps.idle_min": _udps(flow, "idle_min"),
+        "src2dst_syn_packets": fwd_syn,
+        "src2dst_cwr_packets": fwd_cwr,
+        "src2dst_ece_packets": fwd_ece,
+        "src2dst_urg_packets": fwd_urg,
+        "src2dst_ack_packets": fwd_ack,
+        "src2dst_psh_packets": fwd_psh,
+        "src2dst_rst_packets": fwd_rst,
+        "src2dst_fin_packets": fwd_fin,
 
-    "udps.l7_query_length": _udps(flow, "l7_query_length", 0),
+        "dst2src_syn_packets": bwd_syn,
+        "dst2src_cwr_packets": bwd_cwr,
+        "dst2src_ece_packets": bwd_ece,
+        "dst2src_urg_packets": bwd_urg,
+        "dst2src_ack_packets": bwd_ack,
+        "dst2src_psh_packets": bwd_psh,
+        "dst2src_rst_packets": bwd_rst,
+        "dst2src_fin_packets": bwd_fin,
 
-    "udps._fwd_byte_counts": _udps(flow, "_fwd_byte_counts", 0),
-    "udps._bwd_byte_counts": _udps(flow, "_bwd_byte_counts", 0),
+        "udps.fwd_byts_b_avg":
+            _udps(flow, "fwd_byts_b_avg"),
 
-    "udps._fwd_total_bytes": _udps(flow, "_fwd_total_bytes", 0),
-    "udps._bwd_total_bytes": _udps(flow, "_bwd_total_bytes", 0),
+        "udps.fwd_pkts_b_avg":
+            _udps(flow, "fwd_pkts_b_avg"),
 
-    "Flow Byts/s": flow.bidirectional_bytes / dur,
-    "Flow Pkts/s": flow.bidirectional_packets / dur,
+        "udps.fwd_blk_rate_avg":
+            _udps(flow, "fwd_blk_rate_avg"),
 
-    "Bwd Pkts/s": flow.dst2src_packets / dur,
+        "udps.bwd_byts_b_avg":
+            _udps(flow, "bwd_byts_b_avg"),
 
-    "Down/Up Ratio": _safe_div(
-        flow.dst2src_packets,
-        flow.src2dst_packets
-    ),
+        "udps.bwd_pkts_b_avg":
+            _udps(flow, "bwd_pkts_b_avg"),
 
-    "Pkt Len Var": flow.bidirectional_stddev_ps ** 2,
+        "udps.bwd_blk_rate_avg":
+            _udps(flow, "bwd_blk_rate_avg"),
 
-    "Bwd Seg Size Avg": _safe_div(
-        getattr(flow, "dst2src_bytes", 0),
-        flow.dst2src_packets
-    ),
+        "udps.fwd_header_len":
+            _udps(flow, "fwd_header_len"),
 
-    "Fwd IAT Tot": flow.src2dst_duration_ms,
-    "Bwd IAT Tot": flow.dst2src_duration_ms,
-}
+        "udps.bwd_header_len":
+            _udps(flow, "bwd_header_len"),
+
+        "udps.init_fwd_win":
+            _udps(flow, "init_fwd_win", -1),
+
+        "udps.init_bwd_win":
+            _udps(flow, "init_bwd_win", -1),
+
+        "udps.fwd_act_data_pkts":
+            _udps(flow, "fwd_act_data_pkts", 0),
+
+        "udps.fwd_seg_size_min":
+            _udps(flow, "fwd_seg_size_min", 0),
+
+        "udps.active_std":
+            _udps(flow, "active_std"),
+
+        "udps.active_max":
+            _udps(flow, "active_max"),
+
+        "udps.idle_mean":
+            _udps(flow, "idle_mean"),
+
+        "udps.idle_std":
+            _udps(flow, "idle_std"),
+
+        "udps.idle_max":
+            _udps(flow, "idle_max"),
+
+        "udps.idle_min":
+            _udps(flow, "idle_min"),
+
+        "udps.l7_query_length":
+            _udps(flow, "l7_query_length", 0),
+
+        "udps._fwd_byte_counts": sum(_udps(flow, "_fwd_byte_counts", [])),
+        "udps._bwd_byte_counts": sum(_udps(flow, "_bwd_byte_counts", [])),
+
+        "udps._fwd_total_bytes":
+            _udps(flow, "_fwd_total_bytes", 0),
+
+        "Flow Byts/s":
+            getattr(flow, "bidirectional_bytes", 0) / dur,
+
+        "Bwd Pkts/s":
+            getattr(flow, "dst2src_packets", 0) / dur,
+
+        "Down/Up Ratio":
+            _safe_div(
+                getattr(flow, "dst2src_packets", 0),
+                getattr(flow, "src2dst_packets", 0)
+            ),
+
+        "Fwd IAT Tot":
+            getattr(flow, "src2dst_duration_ms", 0),
+
+        "Bwd IAT Tot":
+            getattr(flow, "dst2src_duration_ms", 0),
+    }
+
     return row
