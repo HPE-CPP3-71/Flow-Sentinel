@@ -81,8 +81,8 @@ ICMP_KEY_FEATURES_UDPS = [
 ]
 ICMP_KEY_FEATURES_EX = ['src2dst_min_piat_ms', 'src2dst_packets']
 DNS_KEY_FEATURES_UDPS = [
-    'udps.l7_query_length','udps._fwd_total_bytes',
-    'udps.active_max','udps.bwd_header_len']
+    'l7_query_length','_fwd_total_bytes',
+    'active_max','bwd_header_len']
 DNS_KEY_FEATURES_EX = ['dst2src_max_ps','src2dst_max_ps','bidirectional_bytes','Flow Byts/s','bidirectional_max_piat_ms',
                        'bidirectional_mean_piat_ms','Bwd Pkts/s','Down/Up Ratio']
 # ═══════════════════════════════════════════════════════════════════════════
@@ -100,8 +100,8 @@ class ModelBundle:
 class Models:
     icmp: ModelBundle
     tcp: ModelBundle
+    dns: ModelBundle
     igmp: Optional[ModelBundle] = None
-    dns: Optional[ModelBundle] = None   # not trained yet — see module docstring
 
 
 def load_models(models_dir: str) -> Models:
@@ -203,23 +203,32 @@ def _process_icmp(flow, ts: str, models: Models) -> FlowEvent:
 
     return _build_event(ts, "ICMP", flow, pred, conf,key_features)
 
-
 def _process_dns(flow, ts: str, models: Models) -> FlowEvent:
-        key_features: Dict[str, object] = {}
-        for field in DNS_KEY_FEATURES_UDPS:
-            key_features[f"udps.{field}"] = getattr(flow.udps, field, "MISSING")
-        for field in DNS_KEY_FEATURES_EX:
-            key_features[field] = getattr(flow, field, "MISSING")
-        try:
-            if models.dns is None:
-                raise RuntimeError("DNS model not loaded yet")
-            row = build_dns_row(flow)  # noqa: F821 — intentionally undefined until DNS work lands
-            pred, conf = run_prediction(models.dns.model, models.dns.le, models.dns.fcols, row)
-        except Exception as e:
-            pred, conf = f"ERR:{e}", 0.0
+    row = build_dns_row(flow)
 
-        return _build_event(ts, "DNS", flow, pred, conf, key_features)
+    key_features: Dict[str, object] = {}
 
+    for field in DNS_KEY_FEATURES_UDPS:
+        key_features[f"udps.{field}"] = row.get(f"udps.{field}", "MISSING")
+
+    for field in DNS_KEY_FEATURES_EX:
+        key_features[field] = row.get(field, "MISSING")
+
+    try:
+        if models.dns is None:
+            raise RuntimeError("DNS model not loaded yet")
+
+        pred, conf = run_prediction(
+            models.dns.model,
+            models.dns.le,
+            models.dns.fcols,
+            row,
+        )
+
+    except Exception as e:
+        pred, conf = f"ERR:{e}", 0.0
+
+    return _build_event(ts, "DNS", flow, pred, conf, key_features)
 
 def _process_tcp(flow, ts: str, models: Models) -> FlowEvent:
     key_features: Dict[str, object] = {}
