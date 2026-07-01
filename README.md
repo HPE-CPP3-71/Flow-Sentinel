@@ -26,8 +26,8 @@ Network Flow based Anomaly Detection App
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/HPE-CPP3-71/Flow-Sentinel.git
+cd Flow-Sentinel
 ```
 
 ### 2. Install dependencies
